@@ -1,7 +1,7 @@
 # wow-tts implementation plan
 
 **Updated:** 7 October 2026
-**Status:** Phases 0–2 are done. Phase 3 is in progress.
+**Status:** Phases 0–3 are done. Next up is Phase 4.
 **Scope for starters:** speech, quests and a small addon. No tests, batch jobs or voices endpoint yet.
 
 ## Goal
@@ -168,26 +168,27 @@ The API runs on HTTP only (`http://localhost:5219`), because it's local and has 
 **Skills:** ASP.NET Core hosting, dependency injection, project references, OpenAPI.
 **Commit:** `Create layered solution skeleton`
 
-### Phase 3: Speak any text
+### Phase 3: Speak any text ✅
 
 **Goal:** `POST /api/speech` with some text returns an MP3.
 
-- **Application:**
+- [x] **Application:**
   - the `ISpeechSynthesizer` interface
-  - `SpeechService`, which checks the text isn't empty or too long (so one request can't cost much) and uses the default voice when none is given
-  - the `SpeechRequest` DTO
-- **Infrastructure:**
-  - `AzureSpeechSynthesizer`: the Phase 1 code, now returning MP3 bytes instead of playing through speakers
-  - `SpeechOptions`: key and region from `SPEECH_KEY` and `SPEECH_REGION`, default voice from `appsettings.json`
-- **Api:**
+  - `SpeechService`, which checks the text isn't blank or over 3,000 characters (so one request can't cost much)
+  - the `SpeechRequest` DTO, with an optional voice
+  - `InvalidRequestException` and `SpeechSynthesisException`
+- [x] **Infrastructure:**
+  - `AzureSpeechSynthesizer`: the Phase 1 code, now returning MP3 bytes instead of playing through speakers. Uses the default voice when none is given
+  - `SpeechOptions`: key and region from `SPEECH_KEY` and `SPEECH_REGION`, default voice from `appsettings.json`. The API won't start if the key or region is missing
+- [x] **Api:**
   - `SpeechController`, which returns `audio/mpeg`
   - `GlobalExceptionHandler`, which turns errors into ProblemDetails: 400 for bad input, 502 when Azure fails
   - `WowTts.Api.http` with sample requests
 
 **Done when:**
-- A request from Scalar or the `.http` file returns an MP3 that plays.
-- Empty text gives 400.
-- A wrong key gives 502 with Azure's reason.
+- [x] A request returns an MP3 that plays.
+- [x] Blank or missing text gives 400. An unknown voice gives 400 too, because Azure rejects it as a bad request.
+- [x] A wrong key gives 502 with Azure's reason (authentication error 401).
 
 **Skills:** Speech SDK in a web app, MP3 output format, options pattern, ProblemDetails.
 **Commit:** `Add speech endpoint`
@@ -246,15 +247,15 @@ The API runs on HTTP only (`http://localhost:5219`), because it's local and has 
 | Console app | Removed. Its code moves to Infrastructure | 7 Oct 2026 |
 | Scope for starters | Speech, quests and a small addon. No tests, batch jobs or voices endpoint | 7 Oct 2026 |
 | API docs page | Scalar at `/scalar`, on top of the built-in OpenAPI document | 7 Oct 2026 |
+| Where the key lives | `SPEECH_KEY` and `SPEECH_REGION` environment variables | 8 Oct 2026 |
+| Error handling | Exceptions + one global handler that returns ProblemDetails | 8 Oct 2026 |
+| Default voice | `en-US-GuyNeural`, set in `appsettings.json` | 8 Oct 2026 |
 | How the addon gets audio | The API writes MP3s into the addon folder. The addon only plays local files, because WoW Lua has no network access | 7 Oct 2026 |
 
 ### Open
 
 | # | Decision | Options | Suggestion | Needed by |
 |---|---|---|---|---|
-| 2 | Where the key lives | `SPEECH_KEY` environment variable, user secrets | Keep the environment variables, they're already set | Phase 3 |
-| 3 | Error handling | Exceptions + one global handler, Result type | Exceptions + one handler that returns ProblemDetails | Phase 3 |
-| 4 | Default voice | `en-US-GuyNeural` (standard), a Dragon HD Flash voice | Guy for now. It's one line in `appsettings.json` to change | Phase 3 |
 | 5 | Player placeholders (`$N`, `$R`, `$C`, `$G`) | Generic words like "adventurer", or your character | Generic, so the audio fits any character | Phase 4 |
 | 6 | Read the quest title aloud | Yes, No | No, NPCs don't say it in game | Phase 4 |
 | 7 | Which WoW client "WoW Forever" runs | Modern Classic client (1.14+), original 1.12 client | Tell me which. A 1.12 client has no `GetQuestID`, so the addon would match quests by title instead | Phase 5 |
@@ -294,7 +295,7 @@ Once speech and quests work, these are the natural next steps:
 
 ## Next step
 
-1. Phase 3: `POST /api/speech`.
+1. Phase 4: quest endpoints with the audio cache.
 2. Answer decision 7 when you can: which client does "WoW Forever" run? It's needed by Phase 5.
 
 ## Notes

@@ -1,4 +1,5 @@
 using Scalar.AspNetCore;
+using WowTts.Api.ErrorHandling;
 using WowTts.Application;
 using WowTts.Infrastructure;
 
@@ -11,7 +12,13 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
+// Errors from any layer become ProblemDetails responses (see GlobalExceptionHandler).
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {

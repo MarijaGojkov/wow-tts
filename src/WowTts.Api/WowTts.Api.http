@@ -5,3 +5,28 @@
 
 ### The OpenAPI document, which lists every endpoint
 GET {{host}}/openapi/v1.json
+
+### Speak text with the default voice (returns MP3 audio)
+POST {{host}}/api/speech
+Content-Type: application/json
+
+{
+  "text": "Greetings, adventurer. Kobolds have been stealing candles from the Echo Ridge Mine. Head north and drive them out before they reach the abbey."
+}
+
+### Speak text with a chosen voice
+POST {{host}}/api/speech
+Content-Type: application/json
+
+{
+  "text": "You have done well. The abbey is safe, for now.",
+  "voice": "en-US-JennyNeural"
+}
+
+### Blank text gives 400 Bad Request
+POST {{host}}/api/speech
+Content-Type: application/json
+
+{
+  "text": "   "
+}

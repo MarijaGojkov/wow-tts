@@ -440,8 +440,8 @@ td strong { font-weight: 600; }
       <li class="done"><a href="#phase-0"><span class="node">0</span>Setup</a></li>
       <li class="done"><a href="#phase-1"><span class="node">1</span>First words</a></li>
       <li class="done"><a href="#phase-2"><span class="node">2</span>Skeleton</a></li>
-      <li class="next"><a href="#phase-3"><span class="node">3</span>Speech</a></li>
-      <li><a href="#phase-4"><span class="node">4</span>Quests</a></li>
+      <li class="done"><a href="#phase-3"><span class="node">3</span>Speech</a></li>
+      <li class="next"><a href="#phase-4"><span class="node">4</span>Quests</a></li>
       <li><a href="#phase-5"><span class="node">5</span>Addon</a></li>
     </ol>
   </nav>
@@ -694,30 +694,30 @@ td strong { font-weight: 600; }
         </div>
       </article>
 
-      <article class="quest is-next" id="phase-3">
+      <article class="quest" id="phase-3">
         <header>
           <h3><small>Phase 3</small>Speak any text</h3>
-          <span class="pill next">In progress</span>
+          <span class="pill done">Done</span>
         </header>
         <p class="objective"><code>POST /api/speech</code> with some text returns an MP3.</p>
         <div class="quest-body">
           <div>
             <p class="label">Objectives</p>
             <ul class="tasks">
-              <li><b class="l-app">Application</b>
+              <li class="checked"><b class="l-app">Application</b>
                 <ul>
                   <li>the <code>ISpeechSynthesizer</code> interface</li>
-                  <li><code>SpeechService</code>: checks the text isn't empty or too long, and uses the default voice when none is given</li>
-                  <li>the <code>SpeechRequest</code> DTO</li>
+                  <li><code>SpeechService</code>: checks the text isn't blank or over 3,000 characters</li>
+                  <li>the <code>SpeechRequest</code> DTO with an optional voice, and two exception types</li>
                 </ul>
               </li>
-              <li><b class="l-infra">Infrastructure</b>
+              <li class="checked"><b class="l-infra">Infrastructure</b>
                 <ul>
-                  <li><code>AzureSpeechSynthesizer</code>: the Phase 1 code, now returning MP3 bytes instead of playing through speakers</li>
-                  <li><code>SpeechOptions</code>: key and region from the environment, default voice from <code>appsettings.json</code></li>
+                  <li><code>AzureSpeechSynthesizer</code>: the Phase 1 code, now returning MP3 bytes. Uses the default voice when none is given</li>
+                  <li><code>SpeechOptions</code>: key and region from the environment, default voice from <code>appsettings.json</code>. The API won't start without them</li>
                 </ul>
               </li>
-              <li><b class="l-api">Api</b>
+              <li class="checked"><b class="l-api">Api</b>
                 <ul>
                   <li><code>SpeechController</code>, which returns <code>audio/mpeg</code></li>
                   <li><code>GlobalExceptionHandler</code>: ProblemDetails with 400 for bad input, 502 when Azure fails</li>
@@ -729,9 +729,9 @@ td strong { font-weight: 600; }
           <div class="side">
             <div><p class="label">Complete when</p>
               <ul>
-                <li>A request from Scalar or the <code>.http</code> file returns an MP3 that plays.</li>
-                <li>Empty text gives 400.</li>
-                <li>A wrong key gives 502 with Azure's reason.</li>
+                <li>✓ A request returns an MP3 that plays.</li>
+                <li>✓ Blank text, missing text or an unknown voice gives 400.</li>
+                <li>✓ A wrong key gives 502 with Azure's reason.</li>
               </ul>
             </div>
             <div><p class="label">Skills</p><div class="chips"><span class="chip">Speech SDK in a web app</span><span class="chip">Output formats</span><span class="chip">Options pattern</span><span class="chip">ProblemDetails</span></div></div>
@@ -740,10 +740,10 @@ td strong { font-weight: 600; }
         </div>
       </article>
 
-      <article class="quest" id="phase-4">
+      <article class="quest is-next" id="phase-4">
         <header>
           <h3><small>Phase 4</small>Quests</h3>
-          <span class="pill">Planned</span>
+          <span class="pill next">Next</span>
         </header>
         <p class="objective">List quests and get each quest's audio, generated once and then served from disk.</p>
         <div class="quest-body">
@@ -837,6 +837,9 @@ td strong { font-weight: 600; }
           <tr><td>Console app</td><td>Removed. Its code moves to Infrastructure</td><td class="nowrap">7 Oct 2026</td></tr>
           <tr><td>Scope for starters</td><td>Speech, quests and a small addon. No tests, batch jobs or voices endpoint</td><td class="nowrap">7 Oct 2026</td></tr>
           <tr><td>API docs page</td><td>Scalar at <code>/scalar</code>, on top of the built-in OpenAPI document</td><td class="nowrap">7 Oct 2026</td></tr>
+          <tr><td>Where the key lives</td><td><code>SPEECH_KEY</code> and <code>SPEECH_REGION</code> environment variables</td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Error handling</td><td>Exceptions + one global handler that returns ProblemDetails</td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Default voice</td><td><code>en-US-GuyNeural</code>, set in <code>appsettings.json</code></td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>How the addon gets audio</td><td>The API writes MP3s into the addon folder. The addon only plays local files</td><td class="nowrap">7 Oct 2026</td></tr>
         </tbody>
       </table>
@@ -846,9 +849,6 @@ td strong { font-weight: 600; }
       <table>
         <thead><tr><th>#</th><th>Decision</th><th>Options</th><th>Suggestion</th><th>Needed by</th></tr></thead>
         <tbody>
-          <tr><td class="num">2</td><td>Where the key lives</td><td><code>SPEECH_KEY</code> environment variable, user secrets</td><td>Keep the environment variables, they're already set</td><td class="when">Phase 3</td></tr>
-          <tr><td class="num">3</td><td>Error handling</td><td>Exceptions + one global handler, Result type</td><td>Exceptions + one handler that returns ProblemDetails</td><td class="when">Phase 3</td></tr>
-          <tr><td class="num">4</td><td>Default voice</td><td><code>en-US-GuyNeural</code>, a Dragon HD Flash voice</td><td>Guy for now. It's one line in <code>appsettings.json</code> to change</td><td class="when">Phase 3</td></tr>
           <tr><td class="num">5</td><td>Player placeholders <code>$N</code> <code>$R</code> <code>$C</code> <code>$G</code></td><td>Generic words like "adventurer", or your character</td><td>Generic, so the audio fits any character</td><td class="when">Phase 4</td></tr>
           <tr><td class="num">6</td><td>Read the quest title aloud</td><td>Yes, No</td><td>No, NPCs don't say it in game</td><td class="when">Phase 4</td></tr>
           <tr><td class="num">7</td><td>Which WoW client "WoW Forever" runs</td><td>Modern Classic client (1.14+), original 1.12 client</td><td>Tell me which. A 1.12 client has no <code>GetQuestID</code>, so the addon would match quests by title</td><td class="when">Phase 5</td></tr>
@@ -910,9 +910,9 @@ td strong { font-weight: 600; }
 
   <section class="next-step" id="next">
     <p class="eyebrow">Next step</p>
-    <h2>Phase 3: Speak any text</h2>
+    <h2>Phase 4: Quests</h2>
     <ol>
-      <li>Build <code>POST /api/speech</code>.</li>
+      <li>Build the quest endpoints with the audio cache.</li>
       <li>Answer decision 7 when you can: which client does "WoW Forever" run? It's needed by Phase 5.</li>
     </ol>
   </section>
