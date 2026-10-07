@@ -1,0 +1,768 @@
+<title>wow-tts Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column; the phases read like entries in a quest log, with a phase track up top */
+:root {
+  --bg: #F3F5F8;
+  --surface: #FFFFFF;
+  --ink: #1A1E27;
+  --muted: #5A6271;
+  --line: #D9DEE6;
+  --gold: #8A6100;
+  --gold-soft: #F6EAC4;
+  --azure: #1E5BB8;
+  --azure-soft: #E3EBF8;
+  --ok: #2B7849;
+  --ok-soft: #DCEFE3;
+  --code-bg: #ECEFF4;
+  --f-display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1218; --surface: #171B23; --ink: #E6E8ED; --muted: #9AA2B1; --line: #2A303B;
+    --gold: #E4B848; --gold-soft: #3A2F12; --azure: #82A9EE; --azure-soft: #1A2740;
+    --ok: #6EC28F; --ok-soft: #153020; --code-bg: #1E232D;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1218; --surface: #171B23; --ink: #E6E8ED; --muted: #9AA2B1; --line: #2A303B;
+  --gold: #E4B848; --gold-soft: #3A2F12; --azure: #82A9EE; --azure-soft: #1A2740;
+  --ok: #6EC28F; --ok-soft: #153020; --code-bg: #1E232D;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.6;
+}
+.wrap {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding-inline: 20px;
+  padding-block: 48px 72px;
+  display: grid;
+  gap: 56px;
+}
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+a { color: var(--azure); }
+a:focus-visible { outline: 2px solid var(--azure); outline-offset: 3px; border-radius: 4px; }
+code, .mono { font-family: var(--f-mono); font-size: 0.88em; }
+:not(pre) > code {
+  background: var(--code-bg);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+
+/* Labels */
+.eyebrow {
+  font-family: var(--f-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Header */
+header.top { display: grid; gap: 16px; }
+h1 {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 2.9rem);
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+}
+h1 span { color: var(--gold); }
+.lede { font-size: 1.15rem; color: var(--muted); }
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin: 8px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.meta div { display: grid; gap: 2px; min-width: 0; }
+.meta dt { font-family: var(--f-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.meta dd { margin: 0; font-weight: 500; }
+
+/* Phase track */
+.track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  position: relative;
+}
+.track::before {
+  content: "";
+  position: absolute;
+  left: 5.5%; right: 5.5%;
+  top: 17px;
+  height: 2px;
+  background: var(--line);
+}
+.track li { position: relative; }
+.track a {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+  line-height: 1.3;
+  padding-inline: 2px;
+}
+.node {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--f-mono);
+  font-weight: 500;
+  font-size: 0.85rem;
+  background: var(--bg);
+  border: 2px solid var(--line);
+  color: var(--muted);
+}
+.done .node { background: var(--ok); border-color: var(--ok); color: var(--surface); }
+.next .node { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 0 4px var(--gold-soft); }
+.next a { color: var(--ink); font-weight: 600; }
+.optional .node { border-style: dashed; }
+@media (max-width: 640px) {
+  .track { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 20px; }
+  .track::before { display: none; }
+}
+
+/* Sections */
+section { display: grid; gap: 20px; scroll-margin-top: 24px; }
+h2 {
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 1.55rem;
+  letter-spacing: 0.01em;
+}
+.section-head { display: grid; gap: 6px; }
+
+/* Goal */
+.goal-list { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 68ch; }
+pre {
+  margin: 0;
+  background: var(--code-bg);
+  border-radius: 8px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: var(--f-mono);
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--ink);
+}
+pre .c { color: var(--muted); }
+pre .d { color: var(--gold); }
+
+/* Pipeline */
+.pipeline {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+.pipeline li {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 14px 12px;
+  border-top: 3px solid var(--azure);
+  background: var(--azure-soft);
+  border-radius: 0 0 6px 6px;
+  min-width: 0;
+}
+.pipeline li:last-child { border-top-color: var(--gold); background: var(--gold-soft); }
+.pipeline strong { font-size: 0.95rem; }
+.pipeline span { font-size: 0.85rem; color: var(--muted); line-height: 1.45; }
+.pipeline code { font-size: 0.75rem; background: none; padding: 0; color: var(--azure); }
+.pipeline li:last-child code { color: var(--gold); }
+@media (max-width: 760px) {
+  .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 420px) {
+  .pipeline { grid-template-columns: 1fr; }
+}
+
+/* Tables */
+.table-scroll { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  min-width: 600px;
+}
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th {
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+td.num { font-family: var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; width: 2.5em; }
+td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
+
+/* Quest log entries */
+.log { display: grid; gap: 18px; }
+.quest {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 22px 24px;
+  display: grid;
+  gap: 18px;
+  scroll-margin-top: 24px;
+}
+.quest header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.quest h3 {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--gold);
+}
+.quest h3 small {
+  display: block;
+  font-family: var(--f-mono);
+  font-weight: 400;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.pill {
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pill.done { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.pill.next { background: var(--gold-soft); color: var(--gold); border-color: transparent; }
+.pill.optional { border-style: dashed; }
+.quest.is-next { border-color: var(--gold); }
+.quest .objective { color: var(--muted); }
+.quest-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 24px;
+}
+@media (max-width: 720px) {
+  .quest-body { grid-template-columns: 1fr; }
+  .quest { padding: 18px 16px; }
+}
+.label {
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.tasks li { position: relative; padding-left: 22px; min-width: 0; }
+.tasks li::before {
+  content: "";
+  position: absolute;
+  left: 3px; top: 0.62em;
+  width: 7px; height: 7px;
+  background: var(--gold);
+  transform: rotate(45deg);
+}
+.tasks li.checked::before {
+  width: 11px; height: 6px;
+  left: 2px; top: 0.45em;
+  background: none;
+  border-left: 2px solid var(--ok);
+  border-bottom: 2px solid var(--ok);
+  transform: rotate(-45deg);
+}
+.tasks li.open::before { background: none; border: 1.5px solid var(--gold); }
+.tasks ul { margin: 6px 0 0; padding-left: 1.1em; display: grid; gap: 4px; color: var(--muted); font-size: 0.94rem; }
+.side { display: grid; gap: 16px; align-content: start; }
+.side p { font-size: 0.94rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--azure-soft);
+  color: var(--azure);
+}
+.commit {
+  font-family: var(--f-mono);
+  font-size: 0.82rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* Bottom */
+.two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+@media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+.two-col ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.next-step {
+  background: var(--gold-soft);
+  border-radius: 10px;
+  padding: 22px 24px;
+  display: grid;
+  gap: 12px;
+}
+.next-step h2 { font-size: 1.3rem; }
+.next-step ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <p class="eyebrow">C# console app · Azure AI Speech</p>
+    <h1><span>wow-tts</span> Build Plan</h1>
+    <p class="lede">Turn World of Warcraft quest text into spoken audio, with a voice that fits each quest giver. Built one phase at a time, each ending with something you can run and hear.</p>
+    <dl class="meta">
+      <div><dt>Updated</dt><dd>7 Oct 2026</dd></div>
+      <div><dt>Repo</dt><dd>MarijaGojkov/wow-tts · private</dd></div>
+      <div><dt>Stack</dt><dd>.NET 9 · Speech SDK 1.52.0</dd></div>
+      <div><dt>Region</dt><dd>East US</dd></div>
+    </dl>
+  </header>
+
+  <nav aria-label="Phases">
+    <ol class="track">
+      <li class="done"><a href="#phase-0"><span class="node">0</span>Setup</a></li>
+      <li class="done"><a href="#phase-1"><span class="node">1</span>First words</a></li>
+      <li class="next"><a href="#phase-2"><span class="node">2</span>Save to file</a></li>
+      <li><a href="#phase-3"><span class="node">3</span>Choose voice</a></li>
+      <li><a href="#phase-4"><span class="node">4</span>Quest file</a></li>
+      <li><a href="#phase-5"><span class="node">5</span>NPC voices</a></li>
+      <li><a href="#phase-6"><span class="node">6</span>Thousands</a></li>
+      <li><a href="#phase-7"><span class="node">7</span>Real data</a></li>
+      <li class="optional"><a href="#phase-8"><span class="node">8</span>In game</a></li>
+    </ol>
+  </nav>
+
+  <section id="goal">
+    <div class="section-head">
+      <p class="eyebrow">Goal</p>
+      <h2>What finished looks like</h2>
+    </div>
+    <p>One command reads the quest file and produces every audio file:</p>
+    <pre>dotnet run --project WowQuestTts -- --input data/quests.json --limit 50</pre>
+    <ul class="goal-list">
+      <li>Estimates the cost before spending anything.</li>
+      <li>Creates <code>output/&lt;questId&gt;-accept.mp3</code>, <code>-progress.mp3</code> and <code>-complete.mp3</code> for each quest.</li>
+      <li>Skips files that already exist, so an interrupted run continues where it stopped.</li>
+      <li>Lists any quests that failed, so you can retry just those.</li>
+    </ul>
+  </section>
+
+  <section id="pipeline">
+    <div class="section-head">
+      <p class="eyebrow">How it works</p>
+      <h2>From quest text to audio</h2>
+    </div>
+    <ol class="pipeline">
+      <li><strong>Load</strong><span>Reads the quest file into quest objects</span><code>QuestLoader</code></li>
+      <li><strong>Clean text</strong><span>Replaces <code>$N</code>, <code>$B</code>, <code>$G</code> with words or pauses</span><code>TextCleaner</code></li>
+      <li><strong>Pick voice</strong><span>Quest giver's race and gender → voice</span><code>VoicePicker</code></li>
+      <li><strong>Build SSML</strong><span>Text, voice, pauses and speaking style</span><code>SsmlBuilder</code></li>
+      <li><strong>Azure Speech</strong><span>Sends SSML, gets audio, retries when throttled</span><code>SpeechGenerator</code></li>
+      <li><strong>Save and report</strong><span>Writes files, skips done ones, logs failures</span><code>BatchRunner</code></li>
+    </ol>
+  </section>
+
+  <section id="data">
+    <div class="section-head">
+      <p class="eyebrow">Input</p>
+      <h2>Quest data</h2>
+    </div>
+    <p>Each quest in the JSON file carries these fields. The example is the first quest in Northshire Abbey.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>783</td><td>Quest ID, used in file names</td></tr>
+          <tr><td><code>title</code></td><td>A Threat Within</td><td>Not read aloud (decision 5)</td></tr>
+          <tr><td><code>npcName</code></td><td>Deputy Willem</td><td>Quest giver</td></tr>
+          <tr><td><code>npcRace</code></td><td>Human</td><td>Used to pick the voice</td></tr>
+          <tr><td><code>npcGender</code></td><td>Male</td><td>Used to pick the voice</td></tr>
+          <tr><td><code>acceptText</code></td><td>What the NPC says when you take the quest</td><td>Required</td></tr>
+          <tr><td><code>progressText</code></td><td>What the NPC says if you return early</td><td>Optional</td></tr>
+          <tr><td><code>completeText</code></td><td>What the NPC says when you hand it in</td><td>Optional</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="layout">
+    <div class="section-head">
+      <p class="eyebrow">Structure</p>
+      <h2>Project layout after Phase 6</h2>
+    </div>
+    <p>Files are only added in the phase that needs them, so the project starts as a single <code>Program.cs</code>.</p>
+<pre>wow-tts/
+├─ WowQuestTts/
+│  ├─ Program.cs            <span class="c">entry point: reads options, starts the run</span>
+│  ├─ Options.cs            <span class="c">command-line options</span>
+│  ├─ Models/Quest.cs       <span class="c">the quest data model</span>
+│  ├─ QuestLoader.cs        <span class="c">reads the quest JSON file</span>
+│  ├─ TextCleaner.cs        <span class="c">replaces $N, $B, $G and other placeholders</span>
+│  ├─ VoicePicker.cs        <span class="c">race + gender → voice name</span>
+│  ├─ SsmlBuilder.cs        <span class="c">builds the SSML for one text</span>
+│  ├─ SpeechGenerator.cs    <span class="c">calls Azure Speech, retries on throttling</span>
+│  └─ BatchRunner.cs        <span class="c">loops over quests, skips done files, reports</span>
+├─ WowQuestTts.Tests/       <span class="c">unit tests for cleaner, voice picker and SSML</span>
+├─ data/
+│  ├─ sample-quests.json    <span class="c">5 test quests</span>
+│  └─ settings.json         <span class="c">voices, player profile, audio format, price</span>
+├─ <span class="d">output/</span>                  <span class="c">generated audio (git-ignored)</span>
+├─ PLAN.md
+└─ README.md</pre>
+  </section>
+
+  <section id="phases">
+    <div class="section-head">
+      <p class="eyebrow">Quest log</p>
+      <h2>Phases</h2>
+    </div>
+    <p>Every phase ends with an app that runs, a commit and a push.</p>
+
+    <div class="log">
+
+      <article class="quest" id="phase-0">
+        <header>
+          <h3><small>Phase 0</small>Setup</h3>
+          <span class="pill done">Done</span>
+        </header>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li class="checked">.NET 9 console app <code>WowQuestTts</code> with <code>Microsoft.CognitiveServices.Speech</code> 1.52.0</li>
+              <li class="checked"><code>SPEECH_KEY</code> and <code>SPEECH_REGION=eastus</code> set as user environment variables</li>
+              <li class="checked">Private GitHub repo <code>MarijaGojkov/wow-tts</code></li>
+              <li class="checked">Speech resource and <code>SPEECH_KEY</code> confirmed, proved by Phase 1</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p>Everything is installed and the key works.</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-1">
+        <header>
+          <h3><small>Phase 1</small>First words</h3>
+          <span class="pill done">Done</span>
+        </header>
+        <p class="objective">Hear one quest line through your speakers.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li class="checked">Read <code>SPEECH_KEY</code> and <code>SPEECH_REGION</code>. Stop with a clear message if either is missing.</li>
+              <li class="checked">Create the speech config and a synthesizer with a standard neural voice (<code>en-US-GuyNeural</code>).</li>
+              <li class="checked">Speak one hard-coded quest line.</li>
+              <li class="checked">Check the result. On failure, print the reason and the error details Azure sends back.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p>You hear the line, and a wrong key prints a readable error instead of a crash.</p></div>
+            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">SpeechConfig</span><span class="chip">SpeechSynthesizer</span><span class="chip">Result reasons</span><span class="chip">Cancellation details</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Speak one quest line</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest is-next" id="phase-2">
+        <header>
+          <h3><small>Phase 2</small>Save to a file</h3>
+          <span class="pill next">Next</span>
+        </header>
+        <p class="objective">Write the audio to a file instead of the speakers.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li>Set the output format to MP3.</li>
+              <li>Create <code>output/</code> if it's missing and write <code>output/test.mp3</code>.</li>
+              <li>Print the file path and size.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p><code>output/test.mp3</code> plays in a media player and git doesn't pick it up.</p></div>
+            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">Audio config</span><span class="chip">Output formats</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Save speech to an MP3 file</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-3">
+        <header>
+          <h3><small>Phase 3</small>Choose the voice</h3>
+          <span class="pill">Planned</span>
+        </header>
+        <p class="objective">Hear the difference between voice models and pick yours.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li>Add a <code>--list-voices</code> option that asks the service which voices East US offers and prints the English ones, marking the HD voices.</li>
+              <li>Generate the same quest line with a standard neural voice, a Dragon HD Flash voice and a Dragon HD voice.</li>
+              <li>Listen, then pick a narrator voice plus voices for male and female NPCs.</li>
+              <li>Save your picks in <code>data/settings.json</code>.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p>The three comparison files exist and <code>settings.json</code> holds your picks.</p></div>
+            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">Listing voices</span><span class="chip">HD voice models</span><span class="chip">Cost vs quality</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Compare voices and save voice settings</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-4">
+        <header>
+          <h3><small>Phase 4</small>Quests from a file</h3>
+          <span class="pill">Planned</span>
+        </header>
+        <p class="objective">Generate audio for several quests from a JSON file.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li>Add the <code>Quest</code> model and <code>QuestLoader</code>.</li>
+              <li>Create <code>data/sample-quests.json</code> with 5 quests from different races.</li>
+              <li>Add <code>TextCleaner</code>:
+                <ul>
+                  <li><code>$N</code> becomes the player name from settings</li>
+                  <li><code>$R</code> becomes the race, <code>$C</code> the class</li>
+                  <li><code>$B</code> becomes a pause</li>
+                  <li><code>$Gmale:female;</code> picks the form for the player gender in settings</li>
+                </ul>
+              </li>
+              <li>Write one file per quest text, e.g. <code>783-accept.mp3</code>. Skip empty texts.</li>
+              <li>Add the <code>WowQuestTts.Tests</code> xUnit project with tests for <code>TextCleaner</code>.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p>One run creates the files for all 5 sample quests, and the cleaner tests pass.</p></div>
+            <div><p class="label">Skills</p><div class="chips"><span class="chip">C# records</span><span class="chip">System.Text.Json</span><span class="chip">File handling</span><span class="chip">Unit tests</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Generate audio for quests from a JSON file</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-5">
+        <header>
+          <h3><small>Phase 5</small>A voice for every NPC</h3>
+          <span class="pill">Planned</span>
+        </header>
+        <p class="objective">Quest givers of different races and genders sound different.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li>Add <code>VoicePicker</code>: race + gender → voice from <code>settings.json</code>, with the narrator as fallback.</li>
+              <li>Add <code>SsmlBuilder</code>:
+                <ul>
+                  <li>wraps the cleaned text in SSML with the chosen voice</li>
+                  <li>escapes <code>&amp;</code>, <code>&lt;</code> and <code>&gt;</code></li>
+                  <li>turns <code>$B</code> pauses into <code>&lt;break&gt;</code> elements</li>
+                  <li>optionally sets rate and pitch per race, e.g. slower and lower for orcs</li>
+                </ul>
+              </li>
+              <li>Switch from plain-text synthesis to SSML synthesis.</li>
+              <li>Add tests for the voice picker fallback and SSML escaping.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p>Sample quests from different races sound different, and text containing <code>&amp;</code> or <code>&lt;</code> works.</p></div>
+            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">SSML voice</span><span class="chip">SSML break</span><span class="chip">SSML prosody</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Pick NPC voices and build SSML</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-6">
+        <header>
+          <h3><small>Phase 6</small>Ready for thousands</h3>
+          <span class="pill">Planned</span>
+        </header>
+        <p class="objective">The app runs for hours, survives interruptions and tells you the cost up front.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li>Command-line options: <code>--input</code>, <code>--output</code>, <code>--limit N</code>, <code>--only &lt;questId&gt;</code>, <code>--dry-run</code>, <code>--force</code>, <code>--list-voices</code>.</li>
+              <li>Skip files that already exist, unless <code>--force</code> is given.</li>
+              <li>Retry throttled requests (HTTP 429) and temporary errors with growing waits. After a few failed tries, log the failure and move on.</li>
+              <li>Send one request at a time first. Add a few parallel requests only if it's too slow.</li>
+              <li>Show a progress line for each file, e.g. <code>[120/4000] 783-accept.mp3</code>.</li>
+              <li><code>--dry-run</code> counts characters and estimates the cost from the price in settings, without calling Azure.</li>
+              <li>Print created, skipped and failed counts at the end. Write failures to <code>output/failed.json</code>.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p>A run you stop halfway continues where it stopped, and the dry run prints a character count and cost estimate.</p></div>
+            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">Throttling</span><span class="chip">Retry with backoff</span><span class="chip">Pricing tiers</span><span class="chip">Cost estimation</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Make batch runs resumable and cost-aware</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-7">
+        <header>
+          <h3><small>Phase 7</small>Real quest data</h3>
+          <span class="pill">Planned</span>
+        </header>
+        <p class="objective">Audio for every quest in the game version you play.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li>Choose the data source (decisions 1 and 8).</li>
+              <li>Write a converter from that source into our quest format.</li>
+              <li>Work out each quest giver's race and gender. Use the narrator voice when unknown.</li>
+              <li>Check the data for missing texts, leftover placeholders and very long texts.</li>
+              <li>Set a budget alert in Azure Cost Management.</li>
+              <li>Run one zone first, e.g. Elwynn Forest. Compare the real cost with the estimate, then run the rest.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p>Every quest has audio, and the real cost matches the estimate.</p></div>
+            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">Cost Management</span><span class="chip">Budgets and alerts</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Import real quest data</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-8">
+        <header>
+          <h3><small>Phase 8</small>Play it in game</h3>
+          <span class="pill optional">Optional</span>
+        </header>
+        <p class="objective">Hear the audio when a quest window opens.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li>Look at how the VoiceOver addon names and loads its audio files.</li>
+              <li>Match its folder layout, file names and audio format. That may mean OGG instead of MP3.</li>
+              <li>For your own use only. Don't publish the audio.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p>Opening a quest in game plays its audio.</p></div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section id="decisions">
+    <div class="section-head">
+      <p class="eyebrow">Open questions</p>
+      <h2>Decisions</h2>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>#</th><th>Decision</th><th>Options</th><th>Suggestion</th><th>Needed by</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>Which WoW version</td><td>Classic Era, a 1.12 private server, something else</td><td>Tell me which one "WoW Forever" is</td><td class="when">Phase 7</td></tr>
+          <tr><td class="num">2</td><td>Voice model</td><td>Standard neural, Dragon HD Flash, Dragon HD</td><td>Flash, unless HD sounds clearly better</td><td class="when">Phase 3</td></tr>
+          <tr><td class="num">3</td><td>Pricing tier</td><td>Free F0, Standard S0</td><td>F0 for Phases 1–5, S0 for the full run</td><td class="when">Phase 6</td></tr>
+          <tr><td class="num">4</td><td>Player placeholders <code>$N</code> <code>$R</code> <code>$C</code> <code>$G</code></td><td>Generic words like "adventurer", or your character</td><td>Generic, so the audio fits any character</td><td class="when">Phase 4</td></tr>
+          <tr><td class="num">5</td><td>Read the quest title aloud</td><td>Yes, No</td><td>No, NPCs don't say it in game</td><td class="when">Phase 5</td></tr>
+          <tr><td class="num">6</td><td>Audio format</td><td>MP3, OGG Opus</td><td>MP3 for now, switch if the addon needs OGG</td><td class="when">Phase 8</td></tr>
+          <tr><td class="num">7</td><td>Command-line parsing</td><td>Hand-written, <code>System.CommandLine</code></td><td>Hand-written, there are only a few options</td><td class="when">Phase 6</td></tr>
+          <tr><td class="num">8</td><td>Quest data source</td><td>Private-server database export, addon data files, hand-made</td><td>Depends on decision 1</td><td class="when">Phase 7</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="risks">
+    <div class="section-head">
+      <p class="eyebrow">Watch out for</p>
+      <h2>Risks</h2>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Risk</th><th>How we handle it</th></tr></thead>
+        <tbody>
+          <tr><td>The full run costs more than expected</td><td>Dry-run estimate, <code>--limit</code>, one zone first, budget alert</td></tr>
+          <tr><td>Azure throttles requests (HTTP 429)</td><td>Retry with growing waits, few parallel requests</td></tr>
+          <tr><td>HD voices aren't offered in East US</td><td>Check in Phase 3. If needed, add a Speech resource in another region</td></tr>
+          <tr><td>Placeholders get read aloud ("dollar N")</td><td><code>TextCleaner</code> with tests, and the Phase 7 data check flags leftovers</td></tr>
+          <tr><td><code>&amp;</code> or <code>&lt;</code> in quest text breaks the SSML</td><td>Escape all text, with a test for it</td></tr>
+          <tr><td>Quest text and audio belong to Blizzard</td><td>Private repo, real data exports git-ignored, audio never published</td></tr>
+          <tr><td>The Speech key leaks</td><td>Key only in environment variables, never in a file</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="scope">
+    <div class="two-col">
+      <div class="section-head" style="gap:12px">
+        <p class="eyebrow">Not in this plan</p>
+        <h2>Out of scope</h2>
+        <ul>
+          <li>A graphical interface</li>
+          <li>Generating speech live while you play</li>
+          <li>Custom cloned voices (Custom Neural Voice needs approval from Microsoft)</li>
+          <li>Other languages (possible later by adding voices)</li>
+        </ul>
+      </div>
+      <div class="section-head" style="gap:12px">
+        <p class="eyebrow">Working agreement</p>
+        <h2>How we work</h2>
+        <ul>
+          <li>One phase at a time. Claude writes the code and explains it, you run it.</li>
+          <li>Every phase ends with a working app, a commit and a push.</li>
+          <li>When a decision changes, the plan gets updated.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="next-step" id="next">
+    <p class="eyebrow">Next step</p>
+    <h2>Phase 2: Save to a file</h2>
+    <ol>
+      <li>Start Phase 2: save the audio to an MP3 file.</li>
+      <li>Answer decision 1 when you can: which WoW version is "WoW Forever"? It's needed by Phase 7.</li>
+    </ol>
+  </section>
+
+</div>
