@@ -1,247 +1,301 @@
 # wow-tts implementation plan
 
 **Updated:** 7 October 2026
-**Status:** Phases 0 and 1 are done. Next up is Phase 2.
+**Status:** Phases 0–2 are done. Phase 3 is in progress.
+**Scope for starters:** speech, quests and a small addon. No tests, batch jobs or voices endpoint yet.
 
 ## Goal
 
-A C# console app that reads World of Warcraft quest text from a file and uses Azure AI Speech to create one audio file per quest text, in a voice that fits the quest giver.
+A small ASP.NET Core Web API, built with onion (clean) architecture, that turns World of Warcraft quest text into speech with Azure AI Speech, plus a small WoW addon that plays it.
 
-When it's finished, one command like this does the whole job:
+When it's finished:
 
-```
-dotnet run --project WowQuestTts -- --input data/quests.json --limit 50
-```
+- `POST /api/speech` turns any text into an MP3.
+- `GET /api/quests` lists the quests, and `GET /api/quests/{id}` shows one.
+- `GET /api/quests/783/audio/accept` returns a quest's audio. It's generated on the first request and saved, so Azure is only paid once per text.
+- The audio is saved straight into the addon's folder. When you open a quest in game, the addon plays it.
 
-It will:
+## How the API and the addon work together
 
-- estimate the cost before spending anything
-- create `output/<questId>-accept.mp3`, `-progress.mp3` and `-complete.mp3` for each quest
-- skip files that already exist, so an interrupted run continues where it stopped
-- list any quests that failed, so you can retry just those
-
-## How it works
+WoW addons can't make network calls. WoW's Lua has no HTTP or sockets, so the addon can never call the API. It can only play sound files that are already in its own folder. So the work is split:
 
 ```
-quests.json → Load → Clean text → Pick voice → Build SSML → Azure Speech → MP3 files + report
+ Before playing                                  In game
+ ─────────────                                   ───────
+ you → API → Azure Speech                        quest window opens
+        │                                               │
+        └─ saves  Interface\AddOns\WowTts\audio\        addon builds the path from the quest ID
+                  783-accept.mp3  ───────────────────→  PlaySoundFile(...\783-accept.mp3)
 ```
 
-| Step | What it does | Class |
-|---|---|---|
-| Load | Reads the quest file into quest objects | `QuestLoader` |
-| Clean text | Replaces WoW placeholders such as `$N`, `$B` and `$G` with plain words or pauses | `TextCleaner` |
-| Pick voice | Chooses a voice from the quest giver's race and gender | `VoicePicker` |
-| Build SSML | Wraps the text in SSML with the chosen voice, pauses and speaking style | `SsmlBuilder` |
-| Azure Speech | Sends the SSML to your Speech resource and gets audio back, retrying when throttled | `SpeechGenerator` |
-| Save and report | Writes the files, skips finished ones, counts characters, logs failures | `BatchRunner` |
+1. Before playing, you call the API (from Scalar or the `.http` file). It generates the MP3s straight into the addon's `audio` folder.
+2. In game, the addon listens for the quest window events, takes the quest ID and plays the matching file. If there's no file, nothing happens.
+3. WoW only finds files that existed when the game started. After generating new audio, restart the game. A `/reload` isn't enough.
 
-## Quest data
+## Architecture
 
-Each quest in our JSON file has these fields:
+### Layers
 
-| Field | Example | Notes |
-|---|---|---|
-| `id` | `783` | Quest ID, used in file names |
-| `title` | A Threat Within | Not read aloud (see decision 5) |
-| `npcName` | Deputy Willem | Quest giver |
-| `npcRace` | Human | Used to pick the voice |
-| `npcGender` | Male | Used to pick the voice |
-| `acceptText` | What the NPC says when you take the quest | Required |
-| `progressText` | What the NPC says if you return before finishing | Optional |
-| `completeText` | What the NPC says when you hand the quest in | Optional |
+Four projects. Dependencies point inward: outer layers know about inner layers, never the other way round. Project references enforce this, because a project can only use what it references.
 
-## Project layout
+```
+        ┌──────────────────────────────────────────┐
+        │   Api                 Infrastructure     │   outer ring
+        │   ┌──────────────────────────────────┐   │
+        │   │   Application                    │   │
+        │   │   ┌──────────────────────────┐   │   │
+        │   │   │   Domain                 │   │   │   core
+        │   │   └──────────────────────────┘   │   │
+        │   └──────────────────────────────────┘   │
+        └──────────────────────────────────────────┘
+```
 
-This is where the project ends up after Phase 6. Files are only added in the phase that needs them.
+| Layer | Holds | Depends on | Knows about Azure? |
+|---|---|---|---|
+| **Domain** | `Quest`, `QuestPart`, `TextCleaner`: the WoW rules | Nothing | No |
+| **Application** | `SpeechService`, `QuestService`, the interfaces they need, DTOs | Domain | No |
+| **Infrastructure** | Azure Speech SDK, audio files in the addon folder, quest JSON file | Application, Domain | Yes |
+| **Api** | Controllers, error handling, OpenAPI, wiring everything together | Application, Infrastructure | Only wires it up |
+
+The services in Application only know interfaces such as `ISpeechSynthesizer` and `IAudioStore`. Infrastructure provides the real versions, and `Program.cs` connects the two. Switching from files on disk to Azure Blob Storage later would only touch Infrastructure.
+
+### Endpoints
+
+| Method | Route | What it does | Returns | Phase |
+|---|---|---|---|---|
+| POST | `/api/speech` | Turns text into speech, with an optional voice | 200 `audio/mpeg`, 400, 502 | 3 |
+| GET | `/api/quests` | Lists all quests | 200 JSON | 4 |
+| GET | `/api/quests/{id}` | One quest's details | 200, 404 | 4 |
+| GET | `/api/quests/{id}/audio/{part}` | Audio for `accept`, `progress` or `complete`, generated on first request | 200 `audio/mpeg`, 404 | 4 |
+
+### Request flow: `GET /api/quests/783/audio/accept`
+
+1. **Api**: `QuestsController` calls `QuestService.GetOrCreateAudioAsync(783, Accept)`.
+2. **Application**: asks `IAudioStore` whether `783-accept.mp3` exists. If yes, it returns the file and stops here.
+3. **Application**: loads the quest through `IQuestRepository` and takes its accept text.
+4. **Domain**: `TextCleaner` replaces `$N`, `$B`, `$G` and the other placeholders.
+5. **Infrastructure**: `AzureSpeechSynthesizer` calls Azure Speech and gets MP3 audio back.
+6. **Infrastructure**: `FileAudioStore` saves `783-accept.mp3` in the audio folder from `appsettings.json`, which is the addon's `audio` folder.
+7. **Api**: the controller returns the audio as `audio/mpeg`.
+
+## Solution layout
+
+This is where the solution ends up after Phase 5.
 
 ```
 wow-tts/
-├─ WowQuestTts/
-│  ├─ Program.cs            entry point: reads options, starts the run
-│  ├─ Options.cs            command-line options
-│  ├─ Models/Quest.cs       the quest data model
-│  ├─ QuestLoader.cs        reads the quest JSON file
-│  ├─ TextCleaner.cs        replaces $N, $B, $G and other placeholders
-│  ├─ VoicePicker.cs        race + gender → voice name
-│  ├─ SsmlBuilder.cs        builds the SSML for one text
-│  ├─ SpeechGenerator.cs    calls Azure Speech, retries on throttling
-│  └─ BatchRunner.cs        loops over quests, skips done files, reports
-├─ WowQuestTts.Tests/       unit tests for cleaner, voice picker and SSML
+├─ WowTts.sln
+├─ src/
+│  ├─ WowTts.Domain/
+│  │  ├─ Quests/            Quest, QuestPart
+│  │  └─ Speech/            TextCleaner
+│  ├─ WowTts.Application/
+│  │  ├─ Abstractions/      ISpeechSynthesizer, IQuestRepository, IAudioStore
+│  │  ├─ Speech/            SpeechService, SpeechRequest
+│  │  ├─ Quests/            QuestService, QuestDto
+│  │  └─ DependencyInjection.cs
+│  ├─ WowTts.Infrastructure/
+│  │  ├─ Speech/            AzureSpeechSynthesizer, SpeechOptions
+│  │  ├─ Quests/            JsonQuestRepository
+│  │  ├─ Storage/           FileAudioStore
+│  │  └─ DependencyInjection.cs
+│  └─ WowTts.Api/
+│     ├─ Controllers/       SpeechController, QuestsController
+│     ├─ ErrorHandling/     GlobalExceptionHandler
+│     ├─ Program.cs
+│     ├─ appsettings.json
+│     └─ WowTts.Api.http    sample requests you can click to run
+├─ addon/
+│  └─ WowTts/               the WoW addon, linked into Interface\AddOns\WowTts
+│     ├─ WowTts.toc         addon name, version, files to load
+│     ├─ WowTts.lua         plays audio when a quest window opens
+│     └─ audio/             generated MP3s (git-ignored)
 ├─ data/
-│  ├─ sample-quests.json    5 test quests
-│  └─ settings.json         voices, player profile, audio format, price
-├─ output/                  generated audio (git-ignored)
+│  └─ sample-quests.json    5 hand-written test quests
+├─ docs/plan.html
 ├─ PLAN.md
 └─ README.md
 ```
 
+## Quest data
+
+Each quest in `data/sample-quests.json` has these fields:
+
+| Field | Example | Notes |
+|---|---|---|
+| `id` | `783` | Quest ID, used in routes and file names |
+| `title` | A Threat Within | Not read aloud (see decision 6) |
+| `npcName` | Deputy Willem | Quest giver |
+| `npcRace` | Human | Stored now, used later for NPC voices |
+| `npcGender` | Male | Stored now, used later for NPC voices |
+| `acceptText` | What the NPC says when you take the quest | Required |
+| `progressText` | What the NPC says if you return before finishing | Optional |
+| `completeText` | What the NPC says when you hand the quest in | Optional |
+
 ## Phases
 
-Every phase ends with an app that runs, a commit and a push.
+Every phase ends with an API you can call from the Scalar page, a commit and a push.
 
 ### Phase 0: Setup ✅
 
-- [x] .NET 9 console app `WowQuestTts` with `Microsoft.CognitiveServices.Speech` 1.52.0
-- [x] `SPEECH_KEY` and `SPEECH_REGION=eastus` set as user environment variables
+- [x] .NET 9 SDK, Speech SDK package, `SPEECH_KEY` and `SPEECH_REGION=eastus`
 - [x] Private GitHub repo: `MarijaGojkov/wow-tts`
-- [x] Confirm the Speech resource exists and `SPEECH_KEY` is its key (proved by Phase 1)
+- [x] Speech resource and key confirmed
 
-### Phase 1: First words ✅
+### Phase 1: First words ✅ (console app, replaced in Phase 2)
 
-**Goal:** hear one quest line through your speakers.
+- [x] A console app spoke one quest line with `en-US-GuyNeural`.
+- [x] It proved the key, region and Speech SDK work. Its code moves into Infrastructure in Phase 3.
 
-- [x] Read `SPEECH_KEY` and `SPEECH_REGION`. Stop with a clear message if either is missing.
-- [x] Create the speech config and a synthesizer with a standard neural voice (`en-US-GuyNeural`).
-- [x] Speak one hard-coded quest line.
-- [x] Check the result. On failure, print the reason and the error details Azure sends back.
+### Phase 2: Solution skeleton ✅
 
-**Done when:** you hear the line, and a wrong key prints a readable error instead of a crash.
-**Azure skills:** `SpeechConfig`, `SpeechSynthesizer`, result reasons, cancellation details.
-**Commit:** `Speak one quest line`
+**Goal:** a layered solution that builds and runs, with no features yet.
 
-### Phase 2: Save to a file
+- [x] Create `WowTts.sln` with a `src/` folder.
+- [x] Create the class libraries `WowTts.Domain`, `WowTts.Application` and `WowTts.Infrastructure`, and the Web API `WowTts.Api` with controllers.
+- [x] Add project references so dependencies point inward:
+  - Application → Domain
+  - Infrastructure → Application
+  - Api → Application and Infrastructure
+- [x] Move the Speech SDK package to Infrastructure. Remove the `WowQuestTts` console project and the `SpeachGenerator` library.
+- [x] Add `AddApplication()` and `AddInfrastructure()` extension methods, called from `Program.cs`.
+- [x] Add the built-in OpenAPI document and a Scalar page at `http://localhost:5219/scalar`.
+- [x] Update the README and `.gitignore`.
 
-**Goal:** write the audio to a file instead of the speakers.
+The API runs on HTTP only (`http://localhost:5219`), because it's local and has no login.
 
-- Set the output format to MP3.
-- Create `output/` if it's missing and write `output/test.mp3`.
-- Print the file path and size.
+**Done when:** `dotnet build` passes, the API starts, and the Scalar page opens.
+**Skills:** ASP.NET Core hosting, dependency injection, project references, OpenAPI.
+**Commit:** `Create layered solution skeleton`
 
-**Done when:** `output/test.mp3` plays in a media player and git doesn't pick it up.
-**Azure skills:** audio config, output formats.
-**Commit:** `Save speech to an MP3 file`
+### Phase 3: Speak any text
 
-### Phase 3: Choose the voice
+**Goal:** `POST /api/speech` with some text returns an MP3.
 
-**Goal:** hear the difference between voice models and pick yours.
+- **Application:**
+  - the `ISpeechSynthesizer` interface
+  - `SpeechService`, which checks the text isn't empty or too long (so one request can't cost much) and uses the default voice when none is given
+  - the `SpeechRequest` DTO
+- **Infrastructure:**
+  - `AzureSpeechSynthesizer`: the Phase 1 code, now returning MP3 bytes instead of playing through speakers
+  - `SpeechOptions`: key and region from `SPEECH_KEY` and `SPEECH_REGION`, default voice from `appsettings.json`
+- **Api:**
+  - `SpeechController`, which returns `audio/mpeg`
+  - `GlobalExceptionHandler`, which turns errors into ProblemDetails: 400 for bad input, 502 when Azure fails
+  - `WowTts.Api.http` with sample requests
 
-- Add a `--list-voices` option that asks the service which voices East US offers and prints the English ones, marking the HD voices.
-- Generate the same quest line with a standard neural voice, a Dragon HD Flash voice and a Dragon HD voice.
-- Listen, then pick a narrator voice plus voices for male and female NPCs.
-- Save your picks in `data/settings.json`.
+**Done when:**
+- A request from Scalar or the `.http` file returns an MP3 that plays.
+- Empty text gives 400.
+- A wrong key gives 502 with Azure's reason.
 
-**Done when:** the three comparison files exist and `settings.json` holds your picks.
-**Azure skills:** listing voices, HD voice models, the cost versus quality trade-off.
-**Commit:** `Compare voices and save voice settings`
+**Skills:** Speech SDK in a web app, MP3 output format, options pattern, ProblemDetails.
+**Commit:** `Add speech endpoint`
 
-### Phase 4: Quests from a file
+### Phase 4: Quests
 
-**Goal:** generate audio for several quests from a JSON file.
+**Goal:** list quests and get each quest's audio, generated once and then served from disk.
 
-- Add the `Quest` model and `QuestLoader`.
-- Create `data/sample-quests.json` with 5 quests from different races.
-- Add `TextCleaner`:
-  - `$N` becomes the player name from settings.
-  - `$R` becomes the race and `$C` the class.
-  - `$B` becomes a pause.
-  - `$Gmale:female;` picks the form that matches the player gender in settings.
-- Write one file per quest text, e.g. `783-accept.mp3`. Skip texts that are empty.
-- Add the `WowQuestTts.Tests` xUnit project with tests for `TextCleaner`.
+- **Domain:**
+  - `Quest` and `QuestPart` (Accept, Progress, Complete), plus `Quest.GetText(part)`
+  - `TextCleaner`, which handles `$N`, `$R`, `$C`, `$B` and `$Gmale:female;`
+- **Application:**
+  - `IQuestRepository` and `IAudioStore`
+  - `QuestService`: list quests, get one, and `GetOrCreateAudioAsync`, which uses the saved file if it exists and otherwise cleans the text, synthesizes it and saves it
+- **Infrastructure:**
+  - `JsonQuestRepository` reading `data/sample-quests.json` (5 hand-written quests)
+  - `FileAudioStore` writing `{id}-{part}.mp3` to the audio folder set in `appsettings.json`
+- **Api:** `QuestsController` with `GET /api/quests`, `GET /api/quests/{id}` and `GET /api/quests/{id}/audio/{part}`
 
-**Done when:** one run creates the files for all 5 sample quests, and the cleaner tests pass.
-**Skills:** C# records, `System.Text.Json`, file handling, unit tests.
-**Commit:** `Generate audio for quests from a JSON file`
+**Done when:**
+- `GET /api/quests` lists the 5 sample quests.
+- The first audio request creates the file in the audio folder.
+- The second request returns at once without calling Azure.
+- An unknown quest gives 404.
+- No placeholder like `$N` gets read aloud.
 
-### Phase 5: A voice for every NPC
+**Skills:** domain modelling, repository pattern, caching on disk, dependency injection.
+**Commit:** `Add quest endpoints with audio cache`
 
-**Goal:** quest givers of different races and genders sound different.
+### Phase 5: The addon
 
-- Add `VoicePicker`: race + gender → voice from `settings.json`, with the narrator as fallback.
-- Add `SsmlBuilder`:
-  - wraps the cleaned text in SSML with the chosen voice
-  - escapes `&`, `<` and `>`
-  - turns `$B` pauses into `<break>` elements
-  - optionally sets speaking rate and pitch per race, e.g. slower and lower for orcs
-- Switch from plain-text synthesis to SSML synthesis.
-- Add tests for the voice picker fallback and SSML escaping.
+**Goal:** open a quest in game and hear it.
 
-**Done when:** sample quests from different races sound different, and text containing `&` or `<` works.
-**Azure skills:** SSML `<voice>`, `<break>` and `<prosody>`.
-**Commit:** `Pick NPC voices and build SSML`
+- Create `addon/WowTts/` with `WowTts.toc` and `WowTts.lua`.
+- Link that folder into the game's `Interface\AddOns\WowTts` with a directory junction, so the repo and the game share one copy.
+- Point the API's audio folder at `addon/WowTts/audio/`.
+- In `WowTts.lua`:
+  - listen for the quest window events: `QUEST_DETAIL` (accept), `QUEST_PROGRESS` (progress) and `QUEST_COMPLETE` (complete)
+  - get the quest ID and play `Interface\AddOns\WowTts\audio\<id>-<part>.mp3` with `PlaySoundFile`
+  - stop the sound when the quest window closes (`QUEST_FINISHED`) or a new one starts
+- Add sample quests to `data/sample-quests.json` whose IDs match real quests you can open in game, so the test works for real.
 
-### Phase 6: Ready for thousands
-
-**Goal:** the app can run for hours, survive interruptions and tell you the cost up front.
-
-- Command-line options: `--input`, `--output`, `--limit N`, `--only <questId>`, `--dry-run`, `--force`, `--list-voices`.
-- Skip files that already exist, unless `--force` is given.
-- Retry throttled requests (HTTP 429) and temporary errors with growing waits. After a few failed tries, log the failure and move on.
-- Send one request at a time first. Add a few parallel requests only if it's too slow.
-- Show a progress line for each file, e.g. `[120/4000] 783-accept.mp3`.
-- `--dry-run` counts characters and estimates the cost from the price in settings, without calling Azure.
-- At the end, print how many files were created, skipped and failed. Write failures to `output/failed.json`.
-
-**Done when:** a run that you stop halfway continues where it stopped when you start it again, and the dry run prints a character count and cost estimate.
-**Azure skills:** service limits and throttling, retry with backoff, pricing tiers, cost estimation.
-**Commit:** `Make batch runs resumable and cost-aware`
-
-### Phase 7: Real quest data
-
-**Goal:** audio for every quest in the game version you play.
-
-- Choose the data source (decisions 1 and 8).
-- Write a converter from that source into our quest format.
-- Work out each quest giver's race and gender. Use the narrator voice when unknown.
-- Check the data for missing texts, leftover placeholders and very long texts.
-- Set a budget alert in Azure Cost Management.
-- Run one zone first, e.g. Elwynn Forest. Compare the real cost in the portal with the estimate, then run the rest.
-
-**Done when:** every quest has audio, and the real cost matches the estimate.
-**Azure skills:** Cost Management, budgets and alerts.
-**Commit:** `Import real quest data`
-
-### Phase 8: Play it in game (optional)
-
-**Goal:** hear the audio when a quest window opens.
-
-- Look at how the VoiceOver addon names and loads its audio files.
-- Match its folder layout, file names and audio format. That may mean OGG instead of MP3.
-- For your own use only. Don't publish the audio.
-
-**Done when:** opening a quest in game plays its audio.
+**Done when:** you generate a quest's audio, start the game, open that quest and hear it. Closing the window stops it.
+**Skills:** WoW addon structure (`.toc`), Lua events, `PlaySoundFile` and `StopSound`.
+**Commit:** `Add WoW addon that plays quest audio`
 
 ## Decisions
 
+### Decided
+
+| Decision | Choice | Date |
+|---|---|---|
+| App type | Web API instead of a console app | 7 Oct 2026 |
+| API style | Controllers | 7 Oct 2026 |
+| Projects | 4: Domain, Application, Infrastructure, Api | 7 Oct 2026 |
+| Console app | Removed. Its code moves to Infrastructure | 7 Oct 2026 |
+| Scope for starters | Speech, quests and a small addon. No tests, batch jobs or voices endpoint | 7 Oct 2026 |
+| API docs page | Scalar at `/scalar`, on top of the built-in OpenAPI document | 7 Oct 2026 |
+| How the addon gets audio | The API writes MP3s into the addon folder. The addon only plays local files, because WoW Lua has no network access | 7 Oct 2026 |
+
+### Open
+
 | # | Decision | Options | Suggestion | Needed by |
 |---|---|---|---|---|
-| 1 | Which WoW version | Classic Era, a 1.12 private server, something else | Tell me which one "WoW Forever" is | Phase 7 |
-| 2 | Voice model | Standard neural, Dragon HD Flash, Dragon HD | Flash, unless HD sounds clearly better | Phase 3 |
-| 3 | Pricing tier | Free F0, Standard S0 | F0 for Phases 1–5, S0 for the full run | Phase 6 |
-| 4 | Player placeholders (`$N`, `$R`, `$C`, `$G`) | Generic words like "adventurer", or your character | Generic, so the audio fits any character | Phase 4 |
-| 5 | Read the quest title aloud | Yes, No | No, NPCs don't say it in game | Phase 5 |
-| 6 | Audio format | MP3, OGG Opus | MP3 for now, switch if the addon needs OGG | Phase 8 |
-| 7 | Command-line parsing | Hand-written, `System.CommandLine` | Hand-written, there are only a few options | Phase 6 |
-| 8 | Quest data source | Private-server database export, addon data files, hand-made | Depends on decision 1 | Phase 7 |
+| 2 | Where the key lives | `SPEECH_KEY` environment variable, user secrets | Keep the environment variables, they're already set | Phase 3 |
+| 3 | Error handling | Exceptions + one global handler, Result type | Exceptions + one handler that returns ProblemDetails | Phase 3 |
+| 4 | Default voice | `en-US-GuyNeural` (standard), a Dragon HD Flash voice | Guy for now. It's one line in `appsettings.json` to change | Phase 3 |
+| 5 | Player placeholders (`$N`, `$R`, `$C`, `$G`) | Generic words like "adventurer", or your character | Generic, so the audio fits any character | Phase 4 |
+| 6 | Read the quest title aloud | Yes, No | No, NPCs don't say it in game | Phase 4 |
+| 7 | Which WoW client "WoW Forever" runs | Modern Classic client (1.14+), original 1.12 client | Tell me which. A 1.12 client has no `GetQuestID`, so the addon would match quests by title instead | Phase 5 |
+| 8 | How the addon folder reaches the game | Directory junction from the repo, copy by hand | Junction. One copy, and new audio appears in the game folder at once | Phase 5 |
 
 ## Risks
 
 | Risk | How we handle it |
 |---|---|
-| The full run costs more than expected | Dry-run estimate, `--limit`, one zone first, budget alert |
-| Azure throttles requests (HTTP 429) | Retry with growing waits, few parallel requests |
-| HD voices aren't offered in East US | Check in Phase 3. If needed, add a Speech resource in another region |
-| Placeholders get read aloud ("dollar N") | `TextCleaner` with tests, and the Phase 7 data check flags leftovers |
-| `&` or `<` in quest text breaks the SSML | Escape all text, with a test for it |
-| Quest text and audio belong to Blizzard | Private repo, real data exports git-ignored, audio never published |
+| Costs add up | Maximum text length on `/api/speech`, and quest audio is only generated once |
+| Anyone who can reach the API spends your Azure credit | Runs on localhost only. No hosting until authentication is added |
+| Placeholders get read aloud ("dollar N") | `TextCleaner` handles them in the Domain layer |
+| The addon expects to call the API | It can't: WoW Lua has no network access. The API writes files, the addon only plays them |
+| New audio isn't found in game | WoW only sees files that existed at startup. Generate first, then start the game |
+| The game client is too old for `GetQuestID` | Decision 7. Fall back to matching by quest title |
+| Quest text belongs to Blizzard | Sample quests are hand-written. The repo stays private |
 | The Speech key leaks | Key only in environment variables, never in a file |
 
-## Out of scope
+## Later, not in this plan
 
-- A graphical interface
-- Generating speech live while you play
-- Custom cloned voices (Custom Neural Voice needs approval from Microsoft)
-- Other languages (possible later by adding voices)
+Once speech and quests work, these are the natural next steps:
+
+- A small local website to manage the quests and see what's happening: which have audio, which are missing, listen and regenerate. This is planned much later.
+- WoW's built-in text-to-speech as a fallback for quests without audio, with the addon saving missing quests and their text so the API can generate them (needs a modern client)
+- A voice for every NPC: race and gender pick the voice, built with SSML
+- `GET /api/voices` and comparing Dragon HD voices
+- Generating audio for all quests in one request, then batch jobs with a cost estimate
+- Tests: unit tests for the Domain, and API tests with a fake synthesizer
+- Real quest data for the WoW version you play
+- Deploying to Azure: App Service, Key Vault, managed identity, plus authentication
 
 ## How we work
 
 - One phase at a time. I write the code and explain it, you run it.
-- Every phase ends with a working app, a commit and a push.
+- Every phase ends with a working API, a commit and a push.
 - When a decision changes, this plan gets updated.
 
 ## Next step
 
-1. Start Phase 2: save the audio to an MP3 file.
-2. Answer decision 1 when you can: which WoW version is "WoW Forever"? It's needed by Phase 7.
+1. Phase 3: `POST /api/speech`.
+2. Answer decision 7 when you can: which client does "WoW Forever" run? It's needed by Phase 5.
 
 ## Notes
 

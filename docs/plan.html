@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: one reading column; the phases read like entries in a quest log, with a phase track up top */
+/* Layout: one reading column; how the API and addon meet, then the onion, then phases as quest-log entries */
 :root {
   --bg: #F3F5F8;
   --surface: #FFFFFF;
@@ -56,15 +56,13 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 p { margin: 0; max-width: 68ch; }
 a { color: var(--azure); }
 a:focus-visible { outline: 2px solid var(--azure); outline-offset: 3px; border-radius: 4px; }
-code, .mono { font-family: var(--f-mono); font-size: 0.88em; }
+code { font-family: var(--f-mono); font-size: 0.88em; }
 :not(pre) > code {
   background: var(--code-bg);
   padding: 0.1em 0.35em;
   border-radius: 4px;
   overflow-wrap: anywhere;
 }
-
-/* Labels */
 .eyebrow {
   font-family: var(--f-mono);
   font-size: 0.75rem;
@@ -95,6 +93,15 @@ h1 span { color: var(--gold); }
 .meta div { display: grid; gap: 2px; min-width: 0; }
 .meta dt { font-family: var(--f-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .meta dd { margin: 0; font-weight: 500; }
+.notice {
+  display: grid;
+  gap: 4px;
+  padding: 14px 18px;
+  border-left: 3px solid var(--azure);
+  background: var(--azure-soft);
+  border-radius: 0 8px 8px 0;
+}
+.notice strong { font-weight: 600; }
 
 /* Phase track */
 .track {
@@ -102,13 +109,13 @@ h1 span { color: var(--gold); }
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   position: relative;
 }
 .track::before {
   content: "";
   position: absolute;
-  left: 5.5%; right: 5.5%;
+  left: 8%; right: 8%;
   top: 17px;
   height: 2px;
   background: var(--line);
@@ -139,8 +146,7 @@ h1 span { color: var(--gold); }
 .done .node { background: var(--ok); border-color: var(--ok); color: var(--surface); }
 .next .node { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 0 4px var(--gold-soft); }
 .next a { color: var(--ink); font-weight: 600; }
-.optional .node { border-style: dashed; }
-@media (max-width: 640px) {
+@media (max-width: 520px) {
   .track { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 20px; }
   .track::before { display: none; }
 }
@@ -153,10 +159,10 @@ h2 {
   font-size: 1.55rem;
   letter-spacing: 0.01em;
 }
+h3.sub { font-family: var(--f-body); font-weight: 600; font-size: 1.05rem; }
 .section-head { display: grid; gap: 6px; }
-
-/* Goal */
 .goal-list { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 68ch; }
+
 pre {
   margin: 0;
   background: var(--code-bg);
@@ -164,52 +170,94 @@ pre {
   padding: 16px 18px;
   overflow-x: auto;
   font-family: var(--f-mono);
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   line-height: 1.6;
   color: var(--ink);
 }
 pre .c { color: var(--muted); }
 pre .d { color: var(--gold); }
 
-/* Pipeline */
-.pipeline {
-  list-style: none;
-  margin: 0; padding: 0;
+/* API ↔ addon handoff */
+.handoff {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.side-card {
+  border-radius: 10px;
+  padding: 18px 20px;
+  display: grid;
   gap: 10px;
-}
-.pipeline li {
-  position: relative;
-  display: grid;
   align-content: start;
+}
+.side-card.api { background: var(--azure-soft); }
+.side-card.game { background: var(--gold-soft); }
+.side-card h3 { font-family: var(--f-display); font-weight: 700; font-size: 1.1rem; }
+.side-card.api h3 { color: var(--azure); }
+.side-card.game h3 { color: var(--gold); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.steps li { font-size: 0.94rem; padding-left: 18px; position: relative; }
+.steps li::before { content: "→"; position: absolute; left: 0; color: var(--muted); }
+.steps li:first-child::before { content: "•"; }
+.folder {
+  display: grid;
+  place-items: center;
   gap: 6px;
-  padding: 14px 12px;
-  border-top: 3px solid var(--azure);
-  background: var(--azure-soft);
-  border-radius: 0 0 6px 6px;
-  min-width: 0;
+  text-align: center;
+  padding-inline: 4px;
 }
-.pipeline li:last-child { border-top-color: var(--gold); background: var(--gold-soft); }
-.pipeline strong { font-size: 0.95rem; }
-.pipeline span { font-size: 0.85rem; color: var(--muted); line-height: 1.45; }
-.pipeline code { font-size: 0.75rem; background: none; padding: 0; color: var(--azure); }
-.pipeline li:last-child code { color: var(--gold); }
-@media (max-width: 760px) {
-  .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.folder .file {
+  font-family: var(--f-mono);
+  font-size: 0.78rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  line-height: 1.4;
 }
-@media (max-width: 420px) {
-  .pipeline { grid-template-columns: 1fr; }
+.folder .arrow { font-family: var(--f-mono); color: var(--muted); font-size: 1.2rem; line-height: 1; }
+@media (max-width: 720px) {
+  .handoff { grid-template-columns: 1fr; }
+  .folder .arrow { transform: rotate(90deg); }
 }
+.callout {
+  display: grid;
+  gap: 4px;
+  padding: 14px 18px;
+  border-left: 3px solid var(--gold);
+  background: var(--surface);
+  border-radius: 0 8px 8px 0;
+}
+.callout strong { font-weight: 600; }
+
+/* Onion */
+.onion-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+}
+@media (max-width: 760px) { .onion-wrap { grid-template-columns: 1fr; } }
+.ring { border-radius: 22px; padding: 14px; display: grid; gap: 12px; }
+.ring-name { font-family: var(--f-display); font-weight: 700; font-size: 1.02rem; letter-spacing: 0.02em; }
+.ring-note { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+.ring.outer { background: var(--surface); border: 1.5px solid var(--line); }
+.outer-head { display: flex; justify-content: space-between; gap: 12px; padding-inline: 6px; }
+.outer-head > div:last-child { text-align: right; }
+.ring.mid { background: var(--azure-soft); }
+.ring.mid .ring-name { color: var(--azure); padding-inline: 6px; }
+.ring.mid > .ring-note { padding-inline: 6px; }
+.ring.core { background: var(--gold-soft); text-align: center; padding: 24px 14px; gap: 4px; }
+.ring.core .ring-name { color: var(--gold); font-size: 1.15rem; }
+.rule-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.rule-list li { display: grid; gap: 2px; }
+.rule-list strong { font-weight: 600; }
+.rule-list span { color: var(--muted); font-size: 0.94rem; }
 
 /* Tables */
 .table-scroll { overflow-x: auto; }
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.92rem;
-  min-width: 600px;
-}
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 600px; }
 th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 th {
   font-family: var(--f-mono);
@@ -221,6 +269,49 @@ th {
 }
 td.num { font-family: var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; width: 2.5em; }
 td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
+td.nowrap { white-space: nowrap; }
+td strong { font-weight: 600; }
+.method {
+  display: inline-block;
+  min-width: 4em;
+  text-align: center;
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.m-get { background: var(--azure-soft); color: var(--azure); }
+.m-post { background: var(--gold-soft); color: var(--gold); }
+.yes { color: var(--gold); font-weight: 600; }
+
+/* Flow */
+.flow { list-style: none; margin: 0; padding: 0; display: grid; counter-reset: step; max-width: 44rem; }
+.flow li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 2px 12px;
+  padding-block: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.flow li::before {
+  content: counter(step);
+  grid-row: span 2;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--f-mono);
+  font-size: 0.78rem;
+  background: var(--code-bg);
+  color: var(--muted);
+}
+.flow .layer { font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.layer.l-api, .layer.l-infra { color: var(--muted); }
+.layer.l-app { color: var(--azure); }
+.layer.l-domain { color: var(--gold); }
+.flow p { font-size: 0.94rem; }
 
 /* Quest log entries */
 .log { display: grid; gap: 18px; }
@@ -240,12 +331,7 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
   justify-content: space-between;
   gap: 8px 16px;
 }
-.quest h3 {
-  font-family: var(--f-display);
-  font-weight: 700;
-  font-size: 1.3rem;
-  color: var(--gold);
-}
+.quest h3 { font-family: var(--f-display); font-weight: 700; font-size: 1.3rem; color: var(--gold); }
 .quest h3 small {
   display: block;
   font-family: var(--f-mono);
@@ -269,14 +355,10 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
 }
 .pill.done { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
 .pill.next { background: var(--gold-soft); color: var(--gold); border-color: transparent; }
-.pill.optional { border-style: dashed; }
 .quest.is-next { border-color: var(--gold); }
+.quest.compact { padding-block: 16px; gap: 10px; }
 .quest .objective { color: var(--muted); }
-.quest-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-  gap: 24px;
-}
+.quest-body { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; }
 @media (max-width: 720px) {
   .quest-body { grid-template-columns: 1fr; }
   .quest { padding: 18px 16px; }
@@ -307,36 +389,30 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
   border-bottom: 2px solid var(--ok);
   transform: rotate(-45deg);
 }
-.tasks li.open::before { background: none; border: 1.5px solid var(--gold); }
+.tasks b {
+  font-family: var(--f-mono);
+  font-weight: 500;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+.tasks b.l-domain { color: var(--gold); }
+.tasks b.l-app { color: var(--azure); }
+.tasks b.l-infra, .tasks b.l-api, .tasks b.l-lua { color: var(--muted); }
 .tasks ul { margin: 6px 0 0; padding-left: 1.1em; display: grid; gap: 4px; color: var(--muted); font-size: 0.94rem; }
 .side { display: grid; gap: 16px; align-content: start; }
 .side p { font-size: 0.94rem; }
+.side ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; font-size: 0.94rem; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip {
-  font-size: 0.8rem;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--azure-soft);
-  color: var(--azure);
-}
-.commit {
-  font-family: var(--f-mono);
-  font-size: 0.82rem;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
+.chip { font-size: 0.8rem; padding: 2px 8px; border-radius: 4px; background: var(--azure-soft); color: var(--azure); }
+.commit { font-family: var(--f-mono); font-size: 0.82rem; overflow-wrap: anywhere; }
 
 /* Bottom */
 .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
 @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
 .two-col ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
-.next-step {
-  background: var(--gold-soft);
-  border-radius: 10px;
-  padding: 22px 24px;
-  display: grid;
-  gap: 12px;
-}
+.next-step { background: var(--gold-soft); border-radius: 10px; padding: 22px 24px; display: grid; gap: 12px; }
 .next-step h2 { font-size: 1.3rem; }
 .next-step ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
 </style>
@@ -344,28 +420,29 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
 <div class="wrap">
 
   <header class="top">
-    <p class="eyebrow">C# console app · Azure AI Speech</p>
+    <p class="eyebrow">ASP.NET Core Web API · Onion architecture · WoW addon</p>
     <h1><span>wow-tts</span> Build Plan</h1>
-    <p class="lede">Turn World of Warcraft quest text into spoken audio, with a voice that fits each quest giver. Built one phase at a time, each ending with something you can run and hear.</p>
+    <p class="lede">A small layered Web API that turns World of Warcraft quest text into speech with Azure AI Speech, and a small addon that plays it when you open a quest.</p>
     <dl class="meta">
       <div><dt>Updated</dt><dd>7 Oct 2026</dd></div>
       <div><dt>Repo</dt><dd>MarijaGojkov/wow-tts · private</dd></div>
-      <div><dt>Stack</dt><dd>.NET 9 · Speech SDK 1.52.0</dd></div>
-      <div><dt>Region</dt><dd>East US</dd></div>
+      <div><dt>Stack</dt><dd>.NET 9 · Controllers · Speech SDK · Lua</dd></div>
+      <div><dt>Scope</dt><dd>Speech, quests, addon</dd></div>
     </dl>
+    <div class="notice">
+      <strong>Kept simple on purpose</strong>
+      <p>No tests, batch jobs or voices endpoint for now. Those are listed under Later.</p>
+    </div>
   </header>
 
   <nav aria-label="Phases">
     <ol class="track">
       <li class="done"><a href="#phase-0"><span class="node">0</span>Setup</a></li>
       <li class="done"><a href="#phase-1"><span class="node">1</span>First words</a></li>
-      <li class="next"><a href="#phase-2"><span class="node">2</span>Save to file</a></li>
-      <li><a href="#phase-3"><span class="node">3</span>Choose voice</a></li>
-      <li><a href="#phase-4"><span class="node">4</span>Quest file</a></li>
-      <li><a href="#phase-5"><span class="node">5</span>NPC voices</a></li>
-      <li><a href="#phase-6"><span class="node">6</span>Thousands</a></li>
-      <li><a href="#phase-7"><span class="node">7</span>Real data</a></li>
-      <li class="optional"><a href="#phase-8"><span class="node">8</span>In game</a></li>
+      <li class="done"><a href="#phase-2"><span class="node">2</span>Skeleton</a></li>
+      <li class="next"><a href="#phase-3"><span class="node">3</span>Speech</a></li>
+      <li><a href="#phase-4"><span class="node">4</span>Quests</a></li>
+      <li><a href="#phase-5"><span class="node">5</span>Addon</a></li>
     </ol>
   </nav>
 
@@ -374,29 +451,160 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
       <p class="eyebrow">Goal</p>
       <h2>What finished looks like</h2>
     </div>
-    <p>One command reads the quest file and produces every audio file:</p>
-    <pre>dotnet run --project WowQuestTts -- --input data/quests.json --limit 50</pre>
     <ul class="goal-list">
-      <li>Estimates the cost before spending anything.</li>
-      <li>Creates <code>output/&lt;questId&gt;-accept.mp3</code>, <code>-progress.mp3</code> and <code>-complete.mp3</code> for each quest.</li>
-      <li>Skips files that already exist, so an interrupted run continues where it stopped.</li>
-      <li>Lists any quests that failed, so you can retry just those.</li>
+      <li><code>POST /api/speech</code> turns any text into an MP3.</li>
+      <li><code>GET /api/quests</code> lists the quests, and <code>GET /api/quests/{id}</code> shows one.</li>
+      <li><code>GET /api/quests/783/audio/accept</code> generates a quest's audio once and saves it, so Azure is only paid once per text.</li>
+      <li>The audio is saved straight into the addon's folder. Open the quest in game and the addon plays it.</li>
     </ul>
   </section>
 
-  <section id="pipeline">
+  <section id="handoff">
     <div class="section-head">
-      <p class="eyebrow">How it works</p>
-      <h2>From quest text to audio</h2>
+      <p class="eyebrow">API and addon</p>
+      <h2>How they work together</h2>
     </div>
-    <ol class="pipeline">
-      <li><strong>Load</strong><span>Reads the quest file into quest objects</span><code>QuestLoader</code></li>
-      <li><strong>Clean text</strong><span>Replaces <code>$N</code>, <code>$B</code>, <code>$G</code> with words or pauses</span><code>TextCleaner</code></li>
-      <li><strong>Pick voice</strong><span>Quest giver's race and gender → voice</span><code>VoicePicker</code></li>
-      <li><strong>Build SSML</strong><span>Text, voice, pauses and speaking style</span><code>SsmlBuilder</code></li>
-      <li><strong>Azure Speech</strong><span>Sends SSML, gets audio, retries when throttled</span><code>SpeechGenerator</code></li>
-      <li><strong>Save and report</strong><span>Writes files, skips done ones, logs failures</span><code>BatchRunner</code></li>
+    <div class="callout">
+      <strong>The addon never calls the API.</strong>
+      <p>WoW's Lua has no network access: no HTTP, no sockets. An addon can only play sound files that are already in its own folder. So the API writes the files, and the addon plays them.</p>
+    </div>
+    <div class="handoff">
+      <div class="side-card api">
+        <p class="eyebrow">Before playing</p>
+        <h3>Web API</h3>
+        <ol class="steps">
+          <li>You call the API from Scalar or the <code>.http</code> file</li>
+          <li>The API asks Azure Speech for the audio</li>
+          <li>It saves the MP3 in the addon's <code>audio</code> folder</li>
+        </ol>
+      </div>
+      <div class="folder" aria-label="Shared folder">
+        <span class="arrow">→</span>
+        <span class="file">AddOns\WowTts\audio\<br>783-accept.mp3</span>
+        <span class="arrow">→</span>
+      </div>
+      <div class="side-card game">
+        <p class="eyebrow">In game</p>
+        <h3>WowTts addon</h3>
+        <ol class="steps">
+          <li>A quest window opens</li>
+          <li>The addon takes the quest ID</li>
+          <li><code>PlaySoundFile</code> plays the matching MP3. No file means no sound</li>
+        </ol>
+      </div>
+    </div>
+    <p>WoW only finds files that existed when the game started. After generating new audio, restart the game. A <code>/reload</code> isn't enough.</p>
+  </section>
+
+  <section id="architecture">
+    <div class="section-head">
+      <p class="eyebrow">Architecture</p>
+      <h2>Four layers, dependencies point inward</h2>
+    </div>
+    <div class="onion-wrap">
+      <div class="ring outer" role="img" aria-label="Onion diagram: Api and Infrastructure in the outer ring, Application in the middle, Domain at the core">
+        <div class="outer-head">
+          <div><div class="ring-name">Api</div><div class="ring-note">Controllers, errors, wiring</div></div>
+          <div><div class="ring-name">Infrastructure</div><div class="ring-note">Azure, files, quest JSON</div></div>
+        </div>
+        <div class="ring mid">
+          <div class="ring-name">Application</div>
+          <div class="ring-note">SpeechService, QuestService, interfaces</div>
+          <div class="ring core">
+            <div class="ring-name">Domain</div>
+            <div class="ring-note">Quest, QuestPart, TextCleaner</div>
+          </div>
+        </div>
+      </div>
+      <ul class="rule-list">
+        <li><strong>Outer layers know inner ones, never the reverse.</strong><span>Domain depends on nothing. Project references enforce it, because a project can only use what it references.</span></li>
+        <li><strong>Application defines the interfaces, Infrastructure fills them in.</strong><span><code>ISpeechSynthesizer</code> lives in Application. <code>AzureSpeechSynthesizer</code> lives in Infrastructure.</span></li>
+        <li><strong>Api wires everything up.</strong><span><code>Program.cs</code> calls <code>AddApplication()</code> and <code>AddInfrastructure()</code>.</span></li>
+      </ul>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Layer</th><th>Holds</th><th>Depends on</th><th>Knows Azure</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Domain</strong></td><td><code>Quest</code>, <code>QuestPart</code>, <code>TextCleaner</code>: the WoW rules</td><td>Nothing</td><td>No</td></tr>
+          <tr><td><strong>Application</strong></td><td><code>SpeechService</code>, <code>QuestService</code>, the interfaces they need, DTOs</td><td>Domain</td><td>No</td></tr>
+          <tr><td><strong>Infrastructure</strong></td><td>Azure Speech SDK, audio files in the addon folder, quest JSON file</td><td>Application, Domain</td><td class="yes">Yes</td></tr>
+          <tr><td><strong>Api</strong></td><td>Controllers, error handling, OpenAPI, dependency injection setup</td><td>Application, Infrastructure</td><td>Only wires it</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="endpoints">
+    <div class="section-head">
+      <p class="eyebrow">Api layer</p>
+      <h2>Endpoints</h2>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Method</th><th>Route</th><th>What it does</th><th>Returns</th><th>Phase</th></tr></thead>
+        <tbody>
+          <tr><td><span class="method m-post">POST</span></td><td><code>/api/speech</code></td><td>Turns text into speech, with an optional voice</td><td>200 audio/mpeg, 400, 502</td><td class="when">3</td></tr>
+          <tr><td><span class="method m-get">GET</span></td><td><code>/api/quests</code></td><td>Lists all quests</td><td>200 JSON</td><td class="when">4</td></tr>
+          <tr><td><span class="method m-get">GET</span></td><td><code>/api/quests/{id}</code></td><td>One quest's details</td><td>200, 404</td><td class="when">4</td></tr>
+          <tr><td><span class="method m-get">GET</span></td><td><code>/api/quests/{id}/audio/{part}</code></td><td>Audio for <code>accept</code>, <code>progress</code> or <code>complete</code>, generated on first request</td><td>200 audio/mpeg, 404</td><td class="when">4</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="flow">
+    <div class="section-head">
+      <p class="eyebrow">How a request moves through the layers</p>
+      <h2>Request flow</h2>
+    </div>
+    <h3 class="sub"><code>GET /api/quests/783/audio/accept</code></h3>
+    <ol class="flow">
+      <li><span class="layer l-api">Api</span><p><code>QuestsController</code> calls <code>QuestService.GetOrCreateAudioAsync(783, Accept)</code>.</p></li>
+      <li><span class="layer l-app">Application</span><p>Asks <code>IAudioStore</code> whether <code>783-accept.mp3</code> exists. If yes, it returns the file and stops here.</p></li>
+      <li><span class="layer l-app">Application</span><p>Loads the quest through <code>IQuestRepository</code> and takes its accept text.</p></li>
+      <li><span class="layer l-domain">Domain</span><p><code>TextCleaner</code> replaces <code>$N</code>, <code>$B</code>, <code>$G</code> and the other placeholders.</p></li>
+      <li><span class="layer l-infra">Infrastructure</span><p><code>AzureSpeechSynthesizer</code> calls Azure Speech and gets MP3 audio back.</p></li>
+      <li><span class="layer l-infra">Infrastructure</span><p><code>FileAudioStore</code> saves <code>783-accept.mp3</code> in the addon's <code>audio</code> folder.</p></li>
+      <li><span class="layer l-api">Api</span><p>The controller returns the audio as <code>audio/mpeg</code>, so you can listen in the browser too.</p></li>
     </ol>
+  </section>
+
+  <section id="layout">
+    <div class="section-head">
+      <p class="eyebrow">Structure</p>
+      <h2>Solution layout after Phase 5</h2>
+    </div>
+<pre>wow-tts/
+├─ WowTts.sln
+├─ src/
+│  ├─ <span class="d">WowTts.Domain/</span>
+│  │  ├─ Quests/            <span class="c">Quest, QuestPart</span>
+│  │  └─ Speech/            <span class="c">TextCleaner</span>
+│  ├─ <span class="d">WowTts.Application/</span>
+│  │  ├─ Abstractions/      <span class="c">ISpeechSynthesizer, IQuestRepository, IAudioStore</span>
+│  │  ├─ Speech/            <span class="c">SpeechService, SpeechRequest</span>
+│  │  ├─ Quests/            <span class="c">QuestService, QuestDto</span>
+│  │  └─ DependencyInjection.cs
+│  ├─ <span class="d">WowTts.Infrastructure/</span>
+│  │  ├─ Speech/            <span class="c">AzureSpeechSynthesizer, SpeechOptions</span>
+│  │  ├─ Quests/            <span class="c">JsonQuestRepository</span>
+│  │  ├─ Storage/           <span class="c">FileAudioStore</span>
+│  │  └─ DependencyInjection.cs
+│  └─ <span class="d">WowTts.Api/</span>
+│     ├─ Controllers/       <span class="c">SpeechController, QuestsController</span>
+│     ├─ ErrorHandling/     <span class="c">GlobalExceptionHandler</span>
+│     ├─ Program.cs
+│     ├─ appsettings.json
+│     └─ WowTts.Api.http    <span class="c">sample requests you can click to run</span>
+├─ <span class="d">addon/WowTts/</span>            <span class="c">linked into Interface\AddOns\WowTts</span>
+│  ├─ WowTts.toc            <span class="c">addon name, version, files to load</span>
+│  ├─ WowTts.lua            <span class="c">plays audio when a quest window opens</span>
+│  └─ audio/                <span class="c">generated MP3s (git-ignored)</span>
+├─ data/sample-quests.json  <span class="c">5 hand-written test quests</span>
+├─ docs/plan.html
+├─ PLAN.md
+└─ README.md</pre>
   </section>
 
   <section id="data">
@@ -404,16 +612,15 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
       <p class="eyebrow">Input</p>
       <h2>Quest data</h2>
     </div>
-    <p>Each quest in the JSON file carries these fields. The example is the first quest in Northshire Abbey.</p>
     <div class="table-scroll">
       <table>
         <thead><tr><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
         <tbody>
-          <tr><td><code>id</code></td><td>783</td><td>Quest ID, used in file names</td></tr>
-          <tr><td><code>title</code></td><td>A Threat Within</td><td>Not read aloud (decision 5)</td></tr>
+          <tr><td><code>id</code></td><td>783</td><td>Quest ID, used in routes, file names and by the addon</td></tr>
+          <tr><td><code>title</code></td><td>A Threat Within</td><td>Not read aloud (decision 6)</td></tr>
           <tr><td><code>npcName</code></td><td>Deputy Willem</td><td>Quest giver</td></tr>
-          <tr><td><code>npcRace</code></td><td>Human</td><td>Used to pick the voice</td></tr>
-          <tr><td><code>npcGender</code></td><td>Male</td><td>Used to pick the voice</td></tr>
+          <tr><td><code>npcRace</code></td><td>Human</td><td>Stored now, used later for NPC voices</td></tr>
+          <tr><td><code>npcGender</code></td><td>Male</td><td>Stored now, used later for NPC voices</td></tr>
           <tr><td><code>acceptText</code></td><td>What the NPC says when you take the quest</td><td>Required</td></tr>
           <tr><td><code>progressText</code></td><td>What the NPC says if you return early</td><td>Optional</td></tr>
           <tr><td><code>completeText</code></td><td>What the NPC says when you hand it in</td><td>Optional</td></tr>
@@ -422,266 +629,191 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
     </div>
   </section>
 
-  <section id="layout">
-    <div class="section-head">
-      <p class="eyebrow">Structure</p>
-      <h2>Project layout after Phase 6</h2>
-    </div>
-    <p>Files are only added in the phase that needs them, so the project starts as a single <code>Program.cs</code>.</p>
-<pre>wow-tts/
-├─ WowQuestTts/
-│  ├─ Program.cs            <span class="c">entry point: reads options, starts the run</span>
-│  ├─ Options.cs            <span class="c">command-line options</span>
-│  ├─ Models/Quest.cs       <span class="c">the quest data model</span>
-│  ├─ QuestLoader.cs        <span class="c">reads the quest JSON file</span>
-│  ├─ TextCleaner.cs        <span class="c">replaces $N, $B, $G and other placeholders</span>
-│  ├─ VoicePicker.cs        <span class="c">race + gender → voice name</span>
-│  ├─ SsmlBuilder.cs        <span class="c">builds the SSML for one text</span>
-│  ├─ SpeechGenerator.cs    <span class="c">calls Azure Speech, retries on throttling</span>
-│  └─ BatchRunner.cs        <span class="c">loops over quests, skips done files, reports</span>
-├─ WowQuestTts.Tests/       <span class="c">unit tests for cleaner, voice picker and SSML</span>
-├─ data/
-│  ├─ sample-quests.json    <span class="c">5 test quests</span>
-│  └─ settings.json         <span class="c">voices, player profile, audio format, price</span>
-├─ <span class="d">output/</span>                  <span class="c">generated audio (git-ignored)</span>
-├─ PLAN.md
-└─ README.md</pre>
-  </section>
-
   <section id="phases">
     <div class="section-head">
       <p class="eyebrow">Quest log</p>
       <h2>Phases</h2>
     </div>
-    <p>Every phase ends with an app that runs, a commit and a push.</p>
+    <p>Every phase ends with something you can call or hear, a commit and a push.</p>
 
     <div class="log">
 
-      <article class="quest" id="phase-0">
+      <article class="quest compact" id="phase-0">
         <header>
           <h3><small>Phase 0</small>Setup</h3>
           <span class="pill done">Done</span>
         </header>
-        <div class="quest-body">
-          <div>
-            <p class="label">Objectives</p>
-            <ul class="tasks">
-              <li class="checked">.NET 9 console app <code>WowQuestTts</code> with <code>Microsoft.CognitiveServices.Speech</code> 1.52.0</li>
-              <li class="checked"><code>SPEECH_KEY</code> and <code>SPEECH_REGION=eastus</code> set as user environment variables</li>
-              <li class="checked">Private GitHub repo <code>MarijaGojkov/wow-tts</code></li>
-              <li class="checked">Speech resource and <code>SPEECH_KEY</code> confirmed, proved by Phase 1</li>
-            </ul>
-          </div>
-          <div class="side">
-            <div><p class="label">Complete when</p><p>Everything is installed and the key works.</p></div>
-          </div>
-        </div>
+        <ul class="tasks">
+          <li class="checked">.NET 9 SDK, Speech SDK package, <code>SPEECH_KEY</code> and <code>SPEECH_REGION=eastus</code></li>
+          <li class="checked">Private GitHub repo <code>MarijaGojkov/wow-tts</code></li>
+          <li class="checked">Speech resource and key confirmed</li>
+        </ul>
       </article>
 
-      <article class="quest" id="phase-1">
+      <article class="quest compact" id="phase-1">
         <header>
           <h3><small>Phase 1</small>First words</h3>
+          <span class="pill done">Done · replaced</span>
+        </header>
+        <ul class="tasks">
+          <li class="checked">A console app spoke one quest line with <code>en-US-GuyNeural</code>.</li>
+          <li class="checked">It proved the key, region and SDK work. Its code moves into Infrastructure in Phase 3.</li>
+        </ul>
+      </article>
+
+      <article class="quest" id="phase-2">
+        <header>
+          <h3><small>Phase 2</small>Solution skeleton</h3>
           <span class="pill done">Done</span>
         </header>
-        <p class="objective">Hear one quest line through your speakers.</p>
+        <p class="objective">A layered solution that builds and runs, with no features yet.</p>
         <div class="quest-body">
           <div>
             <p class="label">Objectives</p>
             <ul class="tasks">
-              <li class="checked">Read <code>SPEECH_KEY</code> and <code>SPEECH_REGION</code>. Stop with a clear message if either is missing.</li>
-              <li class="checked">Create the speech config and a synthesizer with a standard neural voice (<code>en-US-GuyNeural</code>).</li>
-              <li class="checked">Speak one hard-coded quest line.</li>
-              <li class="checked">Check the result. On failure, print the reason and the error details Azure sends back.</li>
+              <li class="checked">Create <code>WowTts.sln</code> with a <code>src/</code> folder.</li>
+              <li class="checked">Create the class libraries <code>WowTts.Domain</code>, <code>WowTts.Application</code>, <code>WowTts.Infrastructure</code> and the Web API <code>WowTts.Api</code> with controllers.</li>
+              <li class="checked">Add project references so dependencies point inward:
+                <ul>
+                  <li>Application → Domain</li>
+                  <li>Infrastructure → Application</li>
+                  <li>Api → Application and Infrastructure</li>
+                </ul>
+              </li>
+              <li class="checked">Move the Speech SDK package to Infrastructure. Remove the <code>WowQuestTts</code> console project and the <code>SpeachGenerator</code> library.</li>
+              <li class="checked">Add <code>AddApplication()</code> and <code>AddInfrastructure()</code>, called from <code>Program.cs</code>.</li>
+              <li class="checked">Add the built-in OpenAPI document and a Scalar page at <code>http://localhost:5219/scalar</code>.</li>
+              <li class="checked">Update the README and <code>.gitignore</code>.</li>
             </ul>
           </div>
           <div class="side">
-            <div><p class="label">Complete when</p><p>You hear the line, and a wrong key prints a readable error instead of a crash.</p></div>
-            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">SpeechConfig</span><span class="chip">SpeechSynthesizer</span><span class="chip">Result reasons</span><span class="chip">Cancellation details</span></div></div>
-            <div><p class="label">Commit</p><p class="commit">Speak one quest line</p></div>
+            <div><p class="label">Complete when</p><p><code>dotnet build</code> passes, the API starts, and the Scalar page opens.</p></div>
+            <div><p class="label">Skills</p><div class="chips"><span class="chip">ASP.NET Core hosting</span><span class="chip">Dependency injection</span><span class="chip">Project references</span><span class="chip">OpenAPI</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Create layered solution skeleton</p></div>
           </div>
         </div>
       </article>
 
-      <article class="quest is-next" id="phase-2">
+      <article class="quest is-next" id="phase-3">
         <header>
-          <h3><small>Phase 2</small>Save to a file</h3>
-          <span class="pill next">Next</span>
+          <h3><small>Phase 3</small>Speak any text</h3>
+          <span class="pill next">In progress</span>
         </header>
-        <p class="objective">Write the audio to a file instead of the speakers.</p>
+        <p class="objective"><code>POST /api/speech</code> with some text returns an MP3.</p>
         <div class="quest-body">
           <div>
             <p class="label">Objectives</p>
             <ul class="tasks">
-              <li>Set the output format to MP3.</li>
-              <li>Create <code>output/</code> if it's missing and write <code>output/test.mp3</code>.</li>
-              <li>Print the file path and size.</li>
+              <li><b class="l-app">Application</b>
+                <ul>
+                  <li>the <code>ISpeechSynthesizer</code> interface</li>
+                  <li><code>SpeechService</code>: checks the text isn't empty or too long, and uses the default voice when none is given</li>
+                  <li>the <code>SpeechRequest</code> DTO</li>
+                </ul>
+              </li>
+              <li><b class="l-infra">Infrastructure</b>
+                <ul>
+                  <li><code>AzureSpeechSynthesizer</code>: the Phase 1 code, now returning MP3 bytes instead of playing through speakers</li>
+                  <li><code>SpeechOptions</code>: key and region from the environment, default voice from <code>appsettings.json</code></li>
+                </ul>
+              </li>
+              <li><b class="l-api">Api</b>
+                <ul>
+                  <li><code>SpeechController</code>, which returns <code>audio/mpeg</code></li>
+                  <li><code>GlobalExceptionHandler</code>: ProblemDetails with 400 for bad input, 502 when Azure fails</li>
+                  <li><code>WowTts.Api.http</code> with sample requests</li>
+                </ul>
+              </li>
             </ul>
           </div>
           <div class="side">
-            <div><p class="label">Complete when</p><p><code>output/test.mp3</code> plays in a media player and git doesn't pick it up.</p></div>
-            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">Audio config</span><span class="chip">Output formats</span></div></div>
-            <div><p class="label">Commit</p><p class="commit">Save speech to an MP3 file</p></div>
-          </div>
-        </div>
-      </article>
-
-      <article class="quest" id="phase-3">
-        <header>
-          <h3><small>Phase 3</small>Choose the voice</h3>
-          <span class="pill">Planned</span>
-        </header>
-        <p class="objective">Hear the difference between voice models and pick yours.</p>
-        <div class="quest-body">
-          <div>
-            <p class="label">Objectives</p>
-            <ul class="tasks">
-              <li>Add a <code>--list-voices</code> option that asks the service which voices East US offers and prints the English ones, marking the HD voices.</li>
-              <li>Generate the same quest line with a standard neural voice, a Dragon HD Flash voice and a Dragon HD voice.</li>
-              <li>Listen, then pick a narrator voice plus voices for male and female NPCs.</li>
-              <li>Save your picks in <code>data/settings.json</code>.</li>
-            </ul>
-          </div>
-          <div class="side">
-            <div><p class="label">Complete when</p><p>The three comparison files exist and <code>settings.json</code> holds your picks.</p></div>
-            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">Listing voices</span><span class="chip">HD voice models</span><span class="chip">Cost vs quality</span></div></div>
-            <div><p class="label">Commit</p><p class="commit">Compare voices and save voice settings</p></div>
+            <div><p class="label">Complete when</p>
+              <ul>
+                <li>A request from Scalar or the <code>.http</code> file returns an MP3 that plays.</li>
+                <li>Empty text gives 400.</li>
+                <li>A wrong key gives 502 with Azure's reason.</li>
+              </ul>
+            </div>
+            <div><p class="label">Skills</p><div class="chips"><span class="chip">Speech SDK in a web app</span><span class="chip">Output formats</span><span class="chip">Options pattern</span><span class="chip">ProblemDetails</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Add speech endpoint</p></div>
           </div>
         </div>
       </article>
 
       <article class="quest" id="phase-4">
         <header>
-          <h3><small>Phase 4</small>Quests from a file</h3>
+          <h3><small>Phase 4</small>Quests</h3>
           <span class="pill">Planned</span>
         </header>
-        <p class="objective">Generate audio for several quests from a JSON file.</p>
+        <p class="objective">List quests and get each quest's audio, generated once and then served from disk.</p>
         <div class="quest-body">
           <div>
             <p class="label">Objectives</p>
             <ul class="tasks">
-              <li>Add the <code>Quest</code> model and <code>QuestLoader</code>.</li>
-              <li>Create <code>data/sample-quests.json</code> with 5 quests from different races.</li>
-              <li>Add <code>TextCleaner</code>:
+              <li><b class="l-domain">Domain</b>
                 <ul>
-                  <li><code>$N</code> becomes the player name from settings</li>
-                  <li><code>$R</code> becomes the race, <code>$C</code> the class</li>
-                  <li><code>$B</code> becomes a pause</li>
-                  <li><code>$Gmale:female;</code> picks the form for the player gender in settings</li>
+                  <li><code>Quest</code> and <code>QuestPart</code> (Accept, Progress, Complete), plus <code>Quest.GetText(part)</code></li>
+                  <li><code>TextCleaner</code> for <code>$N</code>, <code>$R</code>, <code>$C</code>, <code>$B</code> and <code>$Gmale:female;</code></li>
                 </ul>
               </li>
-              <li>Write one file per quest text, e.g. <code>783-accept.mp3</code>. Skip empty texts.</li>
-              <li>Add the <code>WowQuestTts.Tests</code> xUnit project with tests for <code>TextCleaner</code>.</li>
+              <li><b class="l-app">Application</b>
+                <ul>
+                  <li><code>IQuestRepository</code> and <code>IAudioStore</code></li>
+                  <li><code>QuestService</code>: list, get one, and <code>GetOrCreateAudioAsync</code>, which uses the saved file or generates and saves a new one</li>
+                </ul>
+              </li>
+              <li><b class="l-infra">Infrastructure</b>
+                <ul>
+                  <li><code>JsonQuestRepository</code> reading <code>data/sample-quests.json</code> (5 hand-written quests)</li>
+                  <li><code>FileAudioStore</code> writing <code>{id}-{part}.mp3</code> to the audio folder set in <code>appsettings.json</code></li>
+                </ul>
+              </li>
+              <li><b class="l-api">Api</b><code>QuestsController</code> with <code>GET /api/quests</code>, <code>/{id}</code> and <code>/{id}/audio/{part}</code>.</li>
             </ul>
           </div>
           <div class="side">
-            <div><p class="label">Complete when</p><p>One run creates the files for all 5 sample quests, and the cleaner tests pass.</p></div>
-            <div><p class="label">Skills</p><div class="chips"><span class="chip">C# records</span><span class="chip">System.Text.Json</span><span class="chip">File handling</span><span class="chip">Unit tests</span></div></div>
-            <div><p class="label">Commit</p><p class="commit">Generate audio for quests from a JSON file</p></div>
+            <div><p class="label">Complete when</p>
+              <ul>
+                <li>The list shows the 5 sample quests.</li>
+                <li>The first audio request creates the file.</li>
+                <li>The second returns at once without calling Azure.</li>
+                <li>An unknown quest gives 404.</li>
+                <li>No <code>$N</code> gets read aloud.</li>
+              </ul>
+            </div>
+            <div><p class="label">Skills</p><div class="chips"><span class="chip">Domain modelling</span><span class="chip">Repository pattern</span><span class="chip">Caching on disk</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Add quest endpoints with audio cache</p></div>
           </div>
         </div>
       </article>
 
       <article class="quest" id="phase-5">
         <header>
-          <h3><small>Phase 5</small>A voice for every NPC</h3>
+          <h3><small>Phase 5</small>The addon</h3>
           <span class="pill">Planned</span>
         </header>
-        <p class="objective">Quest givers of different races and genders sound different.</p>
+        <p class="objective">Open a quest in game and hear it.</p>
         <div class="quest-body">
           <div>
             <p class="label">Objectives</p>
             <ul class="tasks">
-              <li>Add <code>VoicePicker</code>: race + gender → voice from <code>settings.json</code>, with the narrator as fallback.</li>
-              <li>Add <code>SsmlBuilder</code>:
+              <li>Create <code>addon/WowTts/</code> with <code>WowTts.toc</code> and <code>WowTts.lua</code>.</li>
+              <li>Link that folder into the game's <code>Interface\AddOns\WowTts</code> with a directory junction, so the repo and the game share one copy.</li>
+              <li>Point the API's audio folder at <code>addon/WowTts/audio/</code>.</li>
+              <li><b class="l-lua">Lua</b>
                 <ul>
-                  <li>wraps the cleaned text in SSML with the chosen voice</li>
-                  <li>escapes <code>&amp;</code>, <code>&lt;</code> and <code>&gt;</code></li>
-                  <li>turns <code>$B</code> pauses into <code>&lt;break&gt;</code> elements</li>
-                  <li>optionally sets rate and pitch per race, e.g. slower and lower for orcs</li>
+                  <li>listen for <code>QUEST_DETAIL</code> (accept), <code>QUEST_PROGRESS</code> (progress) and <code>QUEST_COMPLETE</code> (complete)</li>
+                  <li>get the quest ID and play <code>audio\&lt;id&gt;-&lt;part&gt;.mp3</code> with <code>PlaySoundFile</code></li>
+                  <li>stop the sound when the window closes (<code>QUEST_FINISHED</code>) or another quest opens</li>
                 </ul>
               </li>
-              <li>Switch from plain-text synthesis to SSML synthesis.</li>
-              <li>Add tests for the voice picker fallback and SSML escaping.</li>
+              <li>Give some sample quests IDs of real quests you can open in game, so the test works for real.</li>
             </ul>
           </div>
           <div class="side">
-            <div><p class="label">Complete when</p><p>Sample quests from different races sound different, and text containing <code>&amp;</code> or <code>&lt;</code> works.</p></div>
-            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">SSML voice</span><span class="chip">SSML break</span><span class="chip">SSML prosody</span></div></div>
-            <div><p class="label">Commit</p><p class="commit">Pick NPC voices and build SSML</p></div>
-          </div>
-        </div>
-      </article>
-
-      <article class="quest" id="phase-6">
-        <header>
-          <h3><small>Phase 6</small>Ready for thousands</h3>
-          <span class="pill">Planned</span>
-        </header>
-        <p class="objective">The app runs for hours, survives interruptions and tells you the cost up front.</p>
-        <div class="quest-body">
-          <div>
-            <p class="label">Objectives</p>
-            <ul class="tasks">
-              <li>Command-line options: <code>--input</code>, <code>--output</code>, <code>--limit N</code>, <code>--only &lt;questId&gt;</code>, <code>--dry-run</code>, <code>--force</code>, <code>--list-voices</code>.</li>
-              <li>Skip files that already exist, unless <code>--force</code> is given.</li>
-              <li>Retry throttled requests (HTTP 429) and temporary errors with growing waits. After a few failed tries, log the failure and move on.</li>
-              <li>Send one request at a time first. Add a few parallel requests only if it's too slow.</li>
-              <li>Show a progress line for each file, e.g. <code>[120/4000] 783-accept.mp3</code>.</li>
-              <li><code>--dry-run</code> counts characters and estimates the cost from the price in settings, without calling Azure.</li>
-              <li>Print created, skipped and failed counts at the end. Write failures to <code>output/failed.json</code>.</li>
-            </ul>
-          </div>
-          <div class="side">
-            <div><p class="label">Complete when</p><p>A run you stop halfway continues where it stopped, and the dry run prints a character count and cost estimate.</p></div>
-            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">Throttling</span><span class="chip">Retry with backoff</span><span class="chip">Pricing tiers</span><span class="chip">Cost estimation</span></div></div>
-            <div><p class="label">Commit</p><p class="commit">Make batch runs resumable and cost-aware</p></div>
-          </div>
-        </div>
-      </article>
-
-      <article class="quest" id="phase-7">
-        <header>
-          <h3><small>Phase 7</small>Real quest data</h3>
-          <span class="pill">Planned</span>
-        </header>
-        <p class="objective">Audio for every quest in the game version you play.</p>
-        <div class="quest-body">
-          <div>
-            <p class="label">Objectives</p>
-            <ul class="tasks">
-              <li>Choose the data source (decisions 1 and 8).</li>
-              <li>Write a converter from that source into our quest format.</li>
-              <li>Work out each quest giver's race and gender. Use the narrator voice when unknown.</li>
-              <li>Check the data for missing texts, leftover placeholders and very long texts.</li>
-              <li>Set a budget alert in Azure Cost Management.</li>
-              <li>Run one zone first, e.g. Elwynn Forest. Compare the real cost with the estimate, then run the rest.</li>
-            </ul>
-          </div>
-          <div class="side">
-            <div><p class="label">Complete when</p><p>Every quest has audio, and the real cost matches the estimate.</p></div>
-            <div><p class="label">Azure skills</p><div class="chips"><span class="chip">Cost Management</span><span class="chip">Budgets and alerts</span></div></div>
-            <div><p class="label">Commit</p><p class="commit">Import real quest data</p></div>
-          </div>
-        </div>
-      </article>
-
-      <article class="quest" id="phase-8">
-        <header>
-          <h3><small>Phase 8</small>Play it in game</h3>
-          <span class="pill optional">Optional</span>
-        </header>
-        <p class="objective">Hear the audio when a quest window opens.</p>
-        <div class="quest-body">
-          <div>
-            <p class="label">Objectives</p>
-            <ul class="tasks">
-              <li>Look at how the VoiceOver addon names and loads its audio files.</li>
-              <li>Match its folder layout, file names and audio format. That may mean OGG instead of MP3.</li>
-              <li>For your own use only. Don't publish the audio.</li>
-            </ul>
-          </div>
-          <div class="side">
-            <div><p class="label">Complete when</p><p>Opening a quest in game plays its audio.</p></div>
+            <div><p class="label">Complete when</p><p>You generate a quest's audio, start the game, open that quest and hear it. Closing the window stops it.</p></div>
+            <div><p class="label">Skills</p><div class="chips"><span class="chip">Addon .toc</span><span class="chip">Lua events</span><span class="chip">PlaySoundFile</span><span class="chip">StopSound</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Add WoW addon that plays quest audio</p></div>
           </div>
         </div>
       </article>
@@ -691,21 +823,36 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
 
   <section id="decisions">
     <div class="section-head">
-      <p class="eyebrow">Open questions</p>
+      <p class="eyebrow">Choices</p>
       <h2>Decisions</h2>
     </div>
+    <h3 class="sub">Decided</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Decision</th><th>Choice</th><th>Date</th></tr></thead>
+        <tbody>
+          <tr><td>App type</td><td>Web API instead of a console app</td><td class="nowrap">7 Oct 2026</td></tr>
+          <tr><td>API style</td><td>Controllers</td><td class="nowrap">7 Oct 2026</td></tr>
+          <tr><td>Projects</td><td>4: Domain, Application, Infrastructure, Api</td><td class="nowrap">7 Oct 2026</td></tr>
+          <tr><td>Console app</td><td>Removed. Its code moves to Infrastructure</td><td class="nowrap">7 Oct 2026</td></tr>
+          <tr><td>Scope for starters</td><td>Speech, quests and a small addon. No tests, batch jobs or voices endpoint</td><td class="nowrap">7 Oct 2026</td></tr>
+          <tr><td>API docs page</td><td>Scalar at <code>/scalar</code>, on top of the built-in OpenAPI document</td><td class="nowrap">7 Oct 2026</td></tr>
+          <tr><td>How the addon gets audio</td><td>The API writes MP3s into the addon folder. The addon only plays local files</td><td class="nowrap">7 Oct 2026</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3 class="sub">Open</h3>
     <div class="table-scroll">
       <table>
         <thead><tr><th>#</th><th>Decision</th><th>Options</th><th>Suggestion</th><th>Needed by</th></tr></thead>
         <tbody>
-          <tr><td class="num">1</td><td>Which WoW version</td><td>Classic Era, a 1.12 private server, something else</td><td>Tell me which one "WoW Forever" is</td><td class="when">Phase 7</td></tr>
-          <tr><td class="num">2</td><td>Voice model</td><td>Standard neural, Dragon HD Flash, Dragon HD</td><td>Flash, unless HD sounds clearly better</td><td class="when">Phase 3</td></tr>
-          <tr><td class="num">3</td><td>Pricing tier</td><td>Free F0, Standard S0</td><td>F0 for Phases 1–5, S0 for the full run</td><td class="when">Phase 6</td></tr>
-          <tr><td class="num">4</td><td>Player placeholders <code>$N</code> <code>$R</code> <code>$C</code> <code>$G</code></td><td>Generic words like "adventurer", or your character</td><td>Generic, so the audio fits any character</td><td class="when">Phase 4</td></tr>
-          <tr><td class="num">5</td><td>Read the quest title aloud</td><td>Yes, No</td><td>No, NPCs don't say it in game</td><td class="when">Phase 5</td></tr>
-          <tr><td class="num">6</td><td>Audio format</td><td>MP3, OGG Opus</td><td>MP3 for now, switch if the addon needs OGG</td><td class="when">Phase 8</td></tr>
-          <tr><td class="num">7</td><td>Command-line parsing</td><td>Hand-written, <code>System.CommandLine</code></td><td>Hand-written, there are only a few options</td><td class="when">Phase 6</td></tr>
-          <tr><td class="num">8</td><td>Quest data source</td><td>Private-server database export, addon data files, hand-made</td><td>Depends on decision 1</td><td class="when">Phase 7</td></tr>
+          <tr><td class="num">2</td><td>Where the key lives</td><td><code>SPEECH_KEY</code> environment variable, user secrets</td><td>Keep the environment variables, they're already set</td><td class="when">Phase 3</td></tr>
+          <tr><td class="num">3</td><td>Error handling</td><td>Exceptions + one global handler, Result type</td><td>Exceptions + one handler that returns ProblemDetails</td><td class="when">Phase 3</td></tr>
+          <tr><td class="num">4</td><td>Default voice</td><td><code>en-US-GuyNeural</code>, a Dragon HD Flash voice</td><td>Guy for now. It's one line in <code>appsettings.json</code> to change</td><td class="when">Phase 3</td></tr>
+          <tr><td class="num">5</td><td>Player placeholders <code>$N</code> <code>$R</code> <code>$C</code> <code>$G</code></td><td>Generic words like "adventurer", or your character</td><td>Generic, so the audio fits any character</td><td class="when">Phase 4</td></tr>
+          <tr><td class="num">6</td><td>Read the quest title aloud</td><td>Yes, No</td><td>No, NPCs don't say it in game</td><td class="when">Phase 4</td></tr>
+          <tr><td class="num">7</td><td>Which WoW client "WoW Forever" runs</td><td>Modern Classic client (1.14+), original 1.12 client</td><td>Tell me which. A 1.12 client has no <code>GetQuestID</code>, so the addon would match quests by title</td><td class="when">Phase 5</td></tr>
+          <tr><td class="num">8</td><td>How the addon folder reaches the game</td><td>Directory junction from the repo, copy by hand</td><td>Junction. One copy, and new audio appears in the game folder at once</td><td class="when">Phase 5</td></tr>
         </tbody>
       </table>
     </div>
@@ -720,12 +867,13 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
       <table>
         <thead><tr><th>Risk</th><th>How we handle it</th></tr></thead>
         <tbody>
-          <tr><td>The full run costs more than expected</td><td>Dry-run estimate, <code>--limit</code>, one zone first, budget alert</td></tr>
-          <tr><td>Azure throttles requests (HTTP 429)</td><td>Retry with growing waits, few parallel requests</td></tr>
-          <tr><td>HD voices aren't offered in East US</td><td>Check in Phase 3. If needed, add a Speech resource in another region</td></tr>
-          <tr><td>Placeholders get read aloud ("dollar N")</td><td><code>TextCleaner</code> with tests, and the Phase 7 data check flags leftovers</td></tr>
-          <tr><td><code>&amp;</code> or <code>&lt;</code> in quest text breaks the SSML</td><td>Escape all text, with a test for it</td></tr>
-          <tr><td>Quest text and audio belong to Blizzard</td><td>Private repo, real data exports git-ignored, audio never published</td></tr>
+          <tr><td>Costs add up</td><td>Maximum text length on <code>/api/speech</code>, and quest audio is only generated once</td></tr>
+          <tr><td>Anyone who can reach the API spends your Azure credit</td><td>Runs on localhost only. No hosting until authentication is added</td></tr>
+          <tr><td>Placeholders get read aloud ("dollar N")</td><td><code>TextCleaner</code> handles them in the Domain layer</td></tr>
+          <tr><td>The addon expects to call the API</td><td>It can't. The API writes files, the addon only plays them</td></tr>
+          <tr><td>New audio isn't found in game</td><td>WoW only sees files that existed at startup. Generate first, then start the game</td></tr>
+          <tr><td>The game client is too old for <code>GetQuestID</code></td><td>Decision 7. Fall back to matching by quest title</td></tr>
+          <tr><td>Quest text belongs to Blizzard</td><td>Sample quests are hand-written. The repo stays private</td></tr>
           <tr><td>The Speech key leaks</td><td>Key only in environment variables, never in a file</td></tr>
         </tbody>
       </table>
@@ -736,12 +884,16 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
     <div class="two-col">
       <div class="section-head" style="gap:12px">
         <p class="eyebrow">Not in this plan</p>
-        <h2>Out of scope</h2>
+        <h2>Later</h2>
         <ul>
-          <li>A graphical interface</li>
-          <li>Generating speech live while you play</li>
-          <li>Custom cloned voices (Custom Neural Voice needs approval from Microsoft)</li>
-          <li>Other languages (possible later by adding voices)</li>
+          <li>A small local website to manage the quests and see what's happening: which have audio, which are missing, listen and regenerate</li>
+          <li>WoW's built-in text-to-speech as a fallback for quests without audio, with the addon saving missing quests so the API can generate them</li>
+          <li>A voice for every NPC: race and gender pick the voice, built with SSML</li>
+          <li><code>GET /api/voices</code> and comparing Dragon HD voices</li>
+          <li>Generating audio for all quests in one request, then batch jobs with a cost estimate</li>
+          <li>Tests: Domain unit tests, API tests with a fake synthesizer</li>
+          <li>Real quest data for the WoW version you play</li>
+          <li>Deploying to Azure: App Service, Key Vault, managed identity, plus authentication</li>
         </ul>
       </div>
       <div class="section-head" style="gap:12px">
@@ -749,7 +901,7 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
         <h2>How we work</h2>
         <ul>
           <li>One phase at a time. Claude writes the code and explains it, you run it.</li>
-          <li>Every phase ends with a working app, a commit and a push.</li>
+          <li>Every phase ends with something you can call or hear, a commit and a push.</li>
           <li>When a decision changes, the plan gets updated.</li>
         </ul>
       </div>
@@ -758,10 +910,10 @@ td.when { white-space: nowrap; color: var(--gold); font-weight: 500; }
 
   <section class="next-step" id="next">
     <p class="eyebrow">Next step</p>
-    <h2>Phase 2: Save to a file</h2>
+    <h2>Phase 3: Speak any text</h2>
     <ol>
-      <li>Start Phase 2: save the audio to an MP3 file.</li>
-      <li>Answer decision 1 when you can: which WoW version is "WoW Forever"? It's needed by Phase 7.</li>
+      <li>Build <code>POST /api/speech</code>.</li>
+      <li>Answer decision 7 when you can: which client does "WoW Forever" run? It's needed by Phase 5.</li>
     </ol>
   </section>
 
