@@ -1,0 +1,7 @@
+@host = http://localhost:5219
+
+# Sample requests for the API. Start the API, then click "Send request" above a request.
+# Each phase adds its endpoints here.
+
+### The OpenAPI document, which lists every endpoint
+GET {{host}}/openapi/v1.json

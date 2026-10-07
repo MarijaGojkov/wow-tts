@@ -484,7 +484,7 @@ $RECYCLE.BIN/
 *.swp
 
 # Generated audio
-output/
+addon/WowTts/audio/
 *.mp3
 *.wav
 
