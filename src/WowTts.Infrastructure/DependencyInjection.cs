@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using WowTts.Application.Abstractions;
+using WowTts.Infrastructure.Quests;
 using WowTts.Infrastructure.Speech;
+using WowTts.Infrastructure.Storage;
 
 namespace WowTts.Infrastructure;
 
@@ -25,6 +27,12 @@ public static class DependencyInjection
             .ValidateOnStart();
 
         services.AddSingleton<ISpeechSynthesizer, AzureSpeechSynthesizer>();
+
+        services.Configure<QuestDataOptions>(configuration.GetSection(QuestDataOptions.SectionName));
+        services.AddSingleton<IQuestRepository, JsonQuestRepository>();
+
+        services.Configure<AudioStorageOptions>(configuration.GetSection(AudioStorageOptions.SectionName));
+        services.AddSingleton<IAudioStore, FileAudioStore>();
 
         return services;
     }

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using WowTts.Application.Quests;
 using WowTts.Application.Speech;
 
 namespace WowTts.Application;
@@ -9,6 +10,7 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<SpeechService>();
+        services.AddScoped<QuestService>();
 
         return services;
     }

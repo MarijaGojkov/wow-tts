@@ -15,6 +15,7 @@ public sealed class GlobalExceptionHandler(
         (int status, string title) = exception switch
         {
             InvalidRequestException => (StatusCodes.Status400BadRequest, "Invalid request"),
+            NotFoundException => (StatusCodes.Status404NotFound, "Not found"),
             SpeechSynthesisException => (StatusCodes.Status502BadGateway, "Azure Speech failed"),
             _ => (StatusCodes.Status500InternalServerError, "Something went wrong")
         };

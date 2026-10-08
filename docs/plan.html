@@ -441,8 +441,8 @@ td strong { font-weight: 600; }
       <li class="done"><a href="#phase-1"><span class="node">1</span>First words</a></li>
       <li class="done"><a href="#phase-2"><span class="node">2</span>Skeleton</a></li>
       <li class="done"><a href="#phase-3"><span class="node">3</span>Speech</a></li>
-      <li class="next"><a href="#phase-4"><span class="node">4</span>Quests</a></li>
-      <li><a href="#phase-5"><span class="node">5</span>Addon</a></li>
+      <li class="done"><a href="#phase-4"><span class="node">4</span>Quests</a></li>
+      <li class="next"><a href="#phase-5"><span class="node">5</span>Addon</a></li>
     </ol>
   </nav>
 
@@ -740,45 +740,45 @@ td strong { font-weight: 600; }
         </div>
       </article>
 
-      <article class="quest is-next" id="phase-4">
+      <article class="quest" id="phase-4">
         <header>
           <h3><small>Phase 4</small>Quests</h3>
-          <span class="pill next">Next</span>
+          <span class="pill done">Done</span>
         </header>
         <p class="objective">List quests and get each quest's audio, generated once and then served from disk.</p>
         <div class="quest-body">
           <div>
             <p class="label">Objectives</p>
             <ul class="tasks">
-              <li><b class="l-domain">Domain</b>
+              <li class="checked"><b class="l-domain">Domain</b>
                 <ul>
                   <li><code>Quest</code> and <code>QuestPart</code> (Accept, Progress, Complete), plus <code>Quest.GetText(part)</code></li>
                   <li><code>TextCleaner</code> for <code>$N</code>, <code>$R</code>, <code>$C</code>, <code>$B</code> and <code>$Gmale:female;</code></li>
                 </ul>
               </li>
-              <li><b class="l-app">Application</b>
+              <li class="checked"><b class="l-app">Application</b>
                 <ul>
                   <li><code>IQuestRepository</code> and <code>IAudioStore</code></li>
                   <li><code>QuestService</code>: list, get one, and <code>GetOrCreateAudioAsync</code>, which uses the saved file or generates and saves a new one</li>
                 </ul>
               </li>
-              <li><b class="l-infra">Infrastructure</b>
+              <li class="checked"><b class="l-infra">Infrastructure</b>
                 <ul>
                   <li><code>JsonQuestRepository</code> reading <code>data/sample-quests.json</code> (5 hand-written quests)</li>
                   <li><code>FileAudioStore</code> writing <code>{id}-{part}.mp3</code> to the audio folder set in <code>appsettings.json</code></li>
                 </ul>
               </li>
-              <li><b class="l-api">Api</b><code>QuestsController</code> with <code>GET /api/quests</code>, <code>/{id}</code> and <code>/{id}/audio/{part}</code>.</li>
+              <li class="checked"><b class="l-api">Api</b><code>QuestsController</code> with <code>GET /api/quests</code>, <code>/{id}</code> and <code>/{id}/audio/{part}</code>.</li>
             </ul>
           </div>
           <div class="side">
             <div><p class="label">Complete when</p>
               <ul>
-                <li>The list shows the 5 sample quests.</li>
-                <li>The first audio request creates the file.</li>
-                <li>The second returns at once without calling Azure.</li>
-                <li>An unknown quest gives 404.</li>
-                <li>No <code>$N</code> gets read aloud.</li>
+                <li>✓ The list shows the 5 sample quests.</li>
+                <li>✓ The first audio request creates the file (about 1.2 s).</li>
+                <li>✓ The second is read from the file (about 60 ms).</li>
+                <li>✓ An unknown quest gives 404.</li>
+                <li>✓ No <code>$N</code> gets read aloud.</li>
               </ul>
             </div>
             <div><p class="label">Skills</p><div class="chips"><span class="chip">Domain modelling</span><span class="chip">Repository pattern</span><span class="chip">Caching on disk</span></div></div>
@@ -840,6 +840,8 @@ td strong { font-weight: 600; }
           <tr><td>Where the key lives</td><td><code>SPEECH_KEY</code> and <code>SPEECH_REGION</code> environment variables</td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>Error handling</td><td>Exceptions + one global handler that returns ProblemDetails</td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>Default voice</td><td><code>en-US-GuyNeural</code>, set in <code>appsettings.json</code></td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Player placeholders</td><td>Generic words: adventurer, traveler, hero. <code>$G</code> takes the first form</td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Quest title</td><td>Not read aloud</td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>How the addon gets audio</td><td>The API writes MP3s into the addon folder. The addon only plays local files</td><td class="nowrap">7 Oct 2026</td></tr>
         </tbody>
       </table>
@@ -849,8 +851,6 @@ td strong { font-weight: 600; }
       <table>
         <thead><tr><th>#</th><th>Decision</th><th>Options</th><th>Suggestion</th><th>Needed by</th></tr></thead>
         <tbody>
-          <tr><td class="num">5</td><td>Player placeholders <code>$N</code> <code>$R</code> <code>$C</code> <code>$G</code></td><td>Generic words like "adventurer", or your character</td><td>Generic, so the audio fits any character</td><td class="when">Phase 4</td></tr>
-          <tr><td class="num">6</td><td>Read the quest title aloud</td><td>Yes, No</td><td>No, NPCs don't say it in game</td><td class="when">Phase 4</td></tr>
           <tr><td class="num">7</td><td>Which WoW client "WoW Forever" runs</td><td>Modern Classic client (1.14+), original 1.12 client</td><td>Tell me which. A 1.12 client has no <code>GetQuestID</code>, so the addon would match quests by title</td><td class="when">Phase 5</td></tr>
           <tr><td class="num">8</td><td>How the addon folder reaches the game</td><td>Directory junction from the repo, copy by hand</td><td>Junction. One copy, and new audio appears in the game folder at once</td><td class="when">Phase 5</td></tr>
         </tbody>
@@ -910,9 +910,9 @@ td strong { font-weight: 600; }
 
   <section class="next-step" id="next">
     <p class="eyebrow">Next step</p>
-    <h2>Phase 4: Quests</h2>
+    <h2>Phase 5</h2>
     <ol>
-      <li>Build the quest endpoints with the audio cache.</li>
+      <li>Start Phase 5.</li>
       <li>Answer decision 7 when you can: which client does "WoW Forever" run? It's needed by Phase 5.</li>
     </ol>
   </section>

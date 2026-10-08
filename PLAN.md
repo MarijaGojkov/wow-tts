@@ -1,7 +1,7 @@
 # wow-tts implementation plan
 
 **Updated:** 7 October 2026
-**Status:** Phases 0–3 are done. Next up is Phase 4.
+**Status:** Phases 0–4 are done. Next up is Phase 5.
 **Scope for starters:** speech, quests and a small addon. No tests, batch jobs or voices endpoint yet.
 
 ## Goal
@@ -193,27 +193,28 @@ The API runs on HTTP only (`http://localhost:5219`), because it's local and has 
 **Skills:** Speech SDK in a web app, MP3 output format, options pattern, ProblemDetails.
 **Commit:** `Add speech endpoint`
 
-### Phase 4: Quests
+### Phase 4: Quests ✅
 
 **Goal:** list quests and get each quest's audio, generated once and then served from disk.
 
-- **Domain:**
-  - `Quest` and `QuestPart` (Accept, Progress, Complete), plus `Quest.GetText(part)`
-  - `TextCleaner`, which handles `$N`, `$R`, `$C`, `$B` and `$Gmale:female;`
-- **Application:**
-  - `IQuestRepository` and `IAudioStore`
+- [x] **Domain:**
+  - `Quest` and `QuestPart` (Accept, Progress, Complete), plus `Quest.GetText(part)`. A quest without an ID, title or accept text is refused
+  - `TextCleaner`: `$N` → adventurer, `$R` → traveler, `$C` → hero, `$B` → line break, `$Gmale:female;` → the first form
+- [x] **Application:**
+  - `IQuestRepository`, `IAudioStore` and `NotFoundException`
   - `QuestService`: list quests, get one, and `GetOrCreateAudioAsync`, which uses the saved file if it exists and otherwise cleans the text, synthesizes it and saves it
-- **Infrastructure:**
-  - `JsonQuestRepository` reading `data/sample-quests.json` (5 hand-written quests)
-  - `FileAudioStore` writing `{id}-{part}.mp3` to the audio folder set in `appsettings.json`
-- **Api:** `QuestsController` with `GET /api/quests`, `GET /api/quests/{id}` and `GET /api/quests/{id}/audio/{part}`
+  - `QuestDto` lists each part's spoken text and whether its audio exists yet
+- [x] **Infrastructure:**
+  - `JsonQuestRepository` reading `data/sample-quests.json` on every request, so edits show up without a restart
+  - `FileAudioStore` writing `{id}-{part}.mp3` to `addon/WowTts/audio/`
+- [x] **Api:** `QuestsController` with `GET /api/quests`, `GET /api/quests/{id}` and `GET /api/quests/{id}/audio/{part}`. Not found → 404, and quest parts are written as text in JSON
 
 **Done when:**
-- `GET /api/quests` lists the 5 sample quests.
-- The first audio request creates the file in the audio folder.
-- The second request returns at once without calling Azure.
-- An unknown quest gives 404.
-- No placeholder like `$N` gets read aloud.
+- [x] `GET /api/quests` lists the 5 sample quests.
+- [x] The first audio request creates the file (about 1.2 s).
+- [x] The second request returns from the file without calling Azure (about 60 ms).
+- [x] An unknown quest, or a part without text, gives 404.
+- [x] No placeholder like `$N` gets read aloud.
 
 **Skills:** domain modelling, repository pattern, caching on disk, dependency injection.
 **Commit:** `Add quest endpoints with audio cache`
@@ -250,14 +251,14 @@ The API runs on HTTP only (`http://localhost:5219`), because it's local and has 
 | Where the key lives | `SPEECH_KEY` and `SPEECH_REGION` environment variables | 8 Oct 2026 |
 | Error handling | Exceptions + one global handler that returns ProblemDetails | 8 Oct 2026 |
 | Default voice | `en-US-GuyNeural`, set in `appsettings.json` | 8 Oct 2026 |
+| Player placeholders | Generic words: adventurer, traveler, hero. `$G` takes the first form | 8 Oct 2026 |
+| Quest title | Not read aloud | 8 Oct 2026 |
 | How the addon gets audio | The API writes MP3s into the addon folder. The addon only plays local files, because WoW Lua has no network access | 7 Oct 2026 |
 
 ### Open
 
 | # | Decision | Options | Suggestion | Needed by |
 |---|---|---|---|---|
-| 5 | Player placeholders (`$N`, `$R`, `$C`, `$G`) | Generic words like "adventurer", or your character | Generic, so the audio fits any character | Phase 4 |
-| 6 | Read the quest title aloud | Yes, No | No, NPCs don't say it in game | Phase 4 |
 | 7 | Which WoW client "WoW Forever" runs | Modern Classic client (1.14+), original 1.12 client | Tell me which. A 1.12 client has no `GetQuestID`, so the addon would match quests by title instead | Phase 5 |
 | 8 | How the addon folder reaches the game | Directory junction from the repo, copy by hand | Junction. One copy, and new audio appears in the game folder at once | Phase 5 |
 
@@ -295,7 +296,7 @@ Once speech and quests work, these are the natural next steps:
 
 ## Next step
 
-1. Phase 4: quest endpoints with the audio cache.
+1. Phase 5.
 2. Answer decision 7 when you can: which client does "WoW Forever" run? It's needed by Phase 5.
 
 ## Notes

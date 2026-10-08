@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Scalar.AspNetCore;
 using WowTts.Api.ErrorHandling;
 using WowTts.Application;
@@ -9,7 +11,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-builder.Services.AddControllers();
+// Enums such as QuestPart are written as text ("accept") instead of numbers in JSON.
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 builder.Services.AddOpenApi();
 
 // Errors from any layer become ProblemDetails responses (see GlobalExceptionHandler).

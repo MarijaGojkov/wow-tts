@@ -1,0 +1,52 @@
+[
+  {
+    "id": 783,
+    "title": "A Threat Within",
+    "npcName": "Deputy Willem",
+    "npcRace": "Human",
+    "npcGender": "Male",
+    "acceptText": "Hey there, $N. Good to see a fresh face. Northshire is crawling with kobolds and wolves, and the Marshal needs every able $C he can get.$B$BHead into the abbey and report to Marshal McBride. He'll tell you where to start.",
+    "progressText": null,
+    "completeText": "Willem sent you? Good. We could use a $Glad:lass; with some fight in $Ghim:her;. Welcome to Northshire."
+  },
+  {
+    "id": 4641,
+    "title": "Your Place In The World",
+    "npcName": "Kaltunk",
+    "npcRace": "Orc",
+    "npcGender": "Male",
+    "acceptText": "Lok'tar, $N. Every $R who comes to the Valley of Trials must prove their worth to the Horde.$B$BGo north to the den and find Gornek. He will see what you are made of.",
+    "progressText": null,
+    "completeText": "So, Kaltunk sent another one. Good. We will soon see if you are strong enough to stand with us."
+  },
+  {
+    "id": 456,
+    "title": "The Balance of Nature",
+    "npcName": "Conservator Ilthalaine",
+    "npcRace": "NightElf",
+    "npcGender": "Male",
+    "acceptText": "Ishnu-alah, $N. The balance of Shadowglen is fragile. The young nightsabers have grown too many, and they threaten the grove.$B$BThin their numbers, $C, and return to me when it is done.",
+    "progressText": "Have you restored the balance of the grove, $N?",
+    "completeText": "You have done well. Elune watches over you, young $Gbrother:sister;."
+  },
+  {
+    "id": 179,
+    "title": "Dwarven Outfitters",
+    "npcName": "Sten Stoutarm",
+    "npcRace": "Dwarf",
+    "npcGender": "Male",
+    "acceptText": "Well met, $N! Ye'll freeze solid out here dressed like that. Bring me some meat and hides from the wolves in the valley, and I'll see ye properly outfitted.",
+    "progressText": "Still no hides? Those wolves won't skin themselves, $C.",
+    "completeText": "Now that's fine work! Here, put this on before ye catch yer death of cold."
+  },
+  {
+    "id": 363,
+    "title": "Rude Awakening",
+    "npcName": "Undertaker Mordo",
+    "npcRace": "Undead",
+    "npcGender": "Male",
+    "acceptText": "You are awake at last, $N. Do not be alarmed. You have been chosen to serve the Dark Lady.$B$BGo outside and find Shadow Priest Sarvis. He will tell you what is expected of you.",
+    "progressText": null,
+    "completeText": "Another one rises. Good. The Forsaken have need of every $R willing to fight."
+  }
+]

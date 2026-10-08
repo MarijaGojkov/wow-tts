@@ -30,3 +30,18 @@ Content-Type: application/json
 {
   "text": "   "
 }
+
+### List all quests, with their text and whether audio exists yet
+GET {{host}}/api/quests
+
+### One quest
+GET {{host}}/api/quests/783
+
+### A quest's accept audio: generated the first time, served from the saved file after that
+GET {{host}}/api/quests/783/audio/accept
+
+### Progress text exists for quest 456
+GET {{host}}/api/quests/456/audio/progress
+
+### Unknown quest gives 404 Not Found
+GET {{host}}/api/quests/999999
