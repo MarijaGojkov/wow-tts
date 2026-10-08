@@ -109,13 +109,13 @@ h1 span { color: var(--gold); }
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   position: relative;
 }
 .track::before {
   content: "";
   position: absolute;
-  left: 8%; right: 8%;
+  left: 7%; right: 7%;
   top: 17px;
   height: 2px;
   background: var(--line);
@@ -442,7 +442,8 @@ td strong { font-weight: 600; }
       <li class="done"><a href="#phase-2"><span class="node">2</span>Skeleton</a></li>
       <li class="done"><a href="#phase-3"><span class="node">3</span>Speech</a></li>
       <li class="done"><a href="#phase-4"><span class="node">4</span>Quests</a></li>
-      <li class="next"><a href="#phase-5"><span class="node">5</span>Addon</a></li>
+      <li class="done"><a href="#phase-5"><span class="node">5</span>Viewer</a></li>
+      <li class="next"><a href="#phase-6"><span class="node">6</span>Addon</a></li>
     </ol>
   </nav>
 
@@ -573,7 +574,7 @@ td strong { font-weight: 600; }
   <section id="layout">
     <div class="section-head">
       <p class="eyebrow">Structure</p>
-      <h2>Solution layout after Phase 5</h2>
+      <h2>Solution layout after Phase 6</h2>
     </div>
 <pre>wow-tts/
 ├─ WowTts.sln
@@ -597,6 +598,7 @@ td strong { font-weight: 600; }
 │     ├─ Program.cs
 │     ├─ appsettings.json
 │     └─ WowTts.Api.http    <span class="c">sample requests you can click to run</span>
+├─ <span class="d">web/</span>                     <span class="c">Quest Voices: React + Vite quest viewer</span>
 ├─ <span class="d">addon/WowTts/</span>            <span class="c">linked into Interface\AddOns\WowTts</span>
 │  ├─ WowTts.toc            <span class="c">addon name, version, files to load</span>
 │  ├─ WowTts.lua            <span class="c">plays audio when a quest window opens</span>
@@ -789,8 +791,33 @@ td strong { font-weight: 600; }
 
       <article class="quest" id="phase-5">
         <header>
-          <h3><small>Phase 5</small>The addon</h3>
-          <span class="pill">Planned</span>
+          <h3><small>Phase 5</small>Quest viewer</h3>
+          <span class="pill done">Done</span>
+        </header>
+        <p class="objective">A small local website to see all quests, read their text, see the NPC, and play each MP3.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li class="checked">React + TypeScript app in <code>web/</code>, built with Vite. It reaches the API through Vite's proxy, so no CORS setup is needed.</li>
+              <li class="checked">Quest list with search and filters (all, with audio, missing audio). Dots show which parts have audio.</li>
+              <li class="checked">Quest page: title, ID, Wowhead link, quest giver name, race and gender.</li>
+              <li class="checked">Each part shows its spoken text, character count and an audio player.</li>
+              <li class="checked">Parts without audio get a <b class="l-api">Generate audio</b> button.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p>✓ You can browse quests, read the text, play the audio and generate missing audio from the page.</p></div>
+            <div><p class="label">Run</p><p><code>npm run dev</code> in <code>web/</code> with the API running, then open <code>http://localhost:5173</code>.</p></div>
+            <div><p class="label">Commit</p><p class="commit">Add quest viewer web app</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest is-next" id="phase-6">
+        <header>
+          <h3><small>Phase 6</small>The addon</h3>
+          <span class="pill next">Next</span>
         </header>
         <p class="objective">Open a quest in game and hear it.</p>
         <div class="quest-body">
@@ -799,7 +826,7 @@ td strong { font-weight: 600; }
             <ul class="tasks">
               <li>Create <code>addon/WowTts/</code> with <code>WowTts.toc</code> and <code>WowTts.lua</code>.</li>
               <li>Link that folder into the game's <code>Interface\AddOns\WowTts</code> with a directory junction, so the repo and the game share one copy.</li>
-              <li>Point the API's audio folder at <code>addon/WowTts/audio/</code>.</li>
+              <li>The API already saves the audio in <code>addon/WowTts/audio/</code>.</li>
               <li><b class="l-lua">Lua</b>
                 <ul>
                   <li>listen for <code>QUEST_DETAIL</code> (accept), <code>QUEST_PROGRESS</code> (progress) and <code>QUEST_COMPLETE</code> (complete)</li>
@@ -851,8 +878,8 @@ td strong { font-weight: 600; }
       <table>
         <thead><tr><th>#</th><th>Decision</th><th>Options</th><th>Suggestion</th><th>Needed by</th></tr></thead>
         <tbody>
-          <tr><td class="num">7</td><td>Which WoW client "WoW Forever" runs</td><td>Modern Classic client (1.14+), original 1.12 client</td><td>Tell me which. A 1.12 client has no <code>GetQuestID</code>, so the addon would match quests by title</td><td class="when">Phase 5</td></tr>
-          <tr><td class="num">8</td><td>How the addon folder reaches the game</td><td>Directory junction from the repo, copy by hand</td><td>Junction. One copy, and new audio appears in the game folder at once</td><td class="when">Phase 5</td></tr>
+          <tr><td class="num">7</td><td>Which WoW client "WoW Forever" runs</td><td>Modern Classic client (1.14+), original 1.12 client</td><td>Tell me which. A 1.12 client has no <code>GetQuestID</code>, so the addon would match quests by title</td><td class="when">Phase 6</td></tr>
+          <tr><td class="num">8</td><td>How the addon folder reaches the game</td><td>Directory junction from the repo, copy by hand</td><td>Junction. One copy, and new audio appears in the game folder at once</td><td class="when">Phase 6</td></tr>
         </tbody>
       </table>
     </div>
@@ -886,7 +913,7 @@ td strong { font-weight: 600; }
         <p class="eyebrow">Not in this plan</p>
         <h2>Later</h2>
         <ul>
-          <li>A small local website to manage the quests and see what's happening: which have audio, which are missing, listen and regenerate</li>
+          <li>More in the quest viewer: regenerate audio, edit quest text, add quests</li>
           <li>WoW's built-in text-to-speech as a fallback for quests without audio, with the addon saving missing quests so the API can generate them</li>
           <li>A voice for every NPC: race and gender pick the voice, built with SSML</li>
           <li><code>GET /api/voices</code> and comparing Dragon HD voices</li>
@@ -910,10 +937,10 @@ td strong { font-weight: 600; }
 
   <section class="next-step" id="next">
     <p class="eyebrow">Next step</p>
-    <h2>Phase 5</h2>
+    <h2>Phase 6: The addon</h2>
     <ol>
-      <li>Start Phase 5.</li>
-      <li>Answer decision 7 when you can: which client does "WoW Forever" run? It's needed by Phase 5.</li>
+      <li>Answer decision 7: which client does "WoW Forever" run?</li>
+      <li>Start Phase 6.</li>
     </ol>
   </section>
 

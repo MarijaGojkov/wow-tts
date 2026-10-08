@@ -33,3 +33,17 @@ dotnet run --project src/WowTts.Api
 ```
 
 Then open http://localhost:5219/scalar to see and try the endpoints. The sample requests in `src/WowTts.Api/WowTts.Api.http` can be run from Visual Studio or VS Code.
+
+## Quest viewer
+
+`web/` is a small React + TypeScript site (Vite) that lists the quests, shows each quest's text and NPC, plays the MP3s, and generates missing audio. Requires Node.js 20 or later.
+
+With the API running:
+
+```powershell
+cd web
+npm install
+npm run dev
+```
+
+Then open http://localhost:5173. Requests to `/api` are forwarded to the API on port 5219 by Vite.

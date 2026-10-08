@@ -1,7 +1,7 @@
 # wow-tts implementation plan
 
 **Updated:** 7 October 2026
-**Status:** Phases 0–4 are done. Next up is Phase 5.
+**Status:** Phases 0–5 are done. Next up is Phase 6, the addon.
 **Scope for starters:** speech, quests and a small addon. No tests, batch jobs or voices endpoint yet.
 
 ## Goal
@@ -13,6 +13,7 @@ When it's finished:
 - `POST /api/speech` turns any text into an MP3.
 - `GET /api/quests` lists the quests, and `GET /api/quests/{id}` shows one.
 - `GET /api/quests/783/audio/accept` returns a quest's audio. It's generated on the first request and saved, so Azure is only paid once per text.
+- A small local website, Quest Voices, shows every quest with its text, the NPC and an audio player.
 - The audio is saved straight into the addon's folder. When you open a quest in game, the addon plays it.
 
 ## How the API and the addon work together
@@ -80,7 +81,7 @@ The services in Application only know interfaces such as `ISpeechSynthesizer` an
 
 ## Solution layout
 
-This is where the solution ends up after Phase 5.
+This is where the solution ends up after Phase 6.
 
 ```
 wow-tts/
@@ -105,6 +106,8 @@ wow-tts/
 │     ├─ Program.cs
 │     ├─ appsettings.json
 │     └─ WowTts.Api.http    sample requests you can click to run
+├─ web/                     Quest Voices: React + Vite quest viewer
+│  └─ src/                  App, QuestList, QuestDetail, api.ts
 ├─ addon/
 │  └─ WowTts/               the WoW addon, linked into Interface\AddOns\WowTts
 │     ├─ WowTts.toc         addon name, version, files to load
@@ -219,13 +222,28 @@ The API runs on HTTP only (`http://localhost:5219`), because it's local and has 
 **Skills:** domain modelling, repository pattern, caching on disk, dependency injection.
 **Commit:** `Add quest endpoints with audio cache`
 
-### Phase 5: The addon
+### Phase 5: Quest viewer ✅
+
+**Goal:** a small local website to see all quests, read their text, see the NPC, and play each MP3.
+
+- [x] React + TypeScript app in `web/`, built with Vite. It talks to the API through Vite's proxy (`/api` → `http://localhost:5219`), so no CORS setup is needed
+- [x] Quest list with search (title, NPC, race or ID) and filters: all, with audio, missing audio. Dots show which parts have audio
+- [x] Quest page: title, quest ID, a Wowhead link, quest giver name, race and gender
+- [x] Each part (accept, progress, complete) shows the spoken text, its character count and an audio player
+- [x] Parts without audio have a **Generate audio** button, which calls the API and shows the player once it's done
+- [x] Header shows how many quests and parts with audio there are. Clear message when the API isn't running
+
+**Done when:** ✓ you can browse the quests, read the text, play the audio, and generate missing audio from the page.
+**Run:** `npm run dev` in `web/` with the API running, then open `http://localhost:5173`.
+**Commit:** `Add quest viewer web app`
+
+### Phase 6: The addon
 
 **Goal:** open a quest in game and hear it.
 
 - Create `addon/WowTts/` with `WowTts.toc` and `WowTts.lua`.
 - Link that folder into the game's `Interface\AddOns\WowTts` with a directory junction, so the repo and the game share one copy.
-- Point the API's audio folder at `addon/WowTts/audio/`.
+- The API already saves the audio in `addon/WowTts/audio/`.
 - In `WowTts.lua`:
   - listen for the quest window events: `QUEST_DETAIL` (accept), `QUEST_PROGRESS` (progress) and `QUEST_COMPLETE` (complete)
   - get the quest ID and play `Interface\AddOns\WowTts\audio\<id>-<part>.mp3` with `PlaySoundFile`
@@ -253,14 +271,15 @@ The API runs on HTTP only (`http://localhost:5219`), because it's local and has 
 | Default voice | `en-US-GuyNeural`, set in `appsettings.json` | 8 Oct 2026 |
 | Player placeholders | Generic words: adventurer, traveler, hero. `$G` takes the first form | 8 Oct 2026 |
 | Quest title | Not read aloud | 8 Oct 2026 |
+| Quest viewer | React + TypeScript with Vite in `web/`, using Vite's proxy to reach the API | 8 Oct 2026 |
 | How the addon gets audio | The API writes MP3s into the addon folder. The addon only plays local files, because WoW Lua has no network access | 7 Oct 2026 |
 
 ### Open
 
 | # | Decision | Options | Suggestion | Needed by |
 |---|---|---|---|---|
-| 7 | Which WoW client "WoW Forever" runs | Modern Classic client (1.14+), original 1.12 client | Tell me which. A 1.12 client has no `GetQuestID`, so the addon would match quests by title instead | Phase 5 |
-| 8 | How the addon folder reaches the game | Directory junction from the repo, copy by hand | Junction. One copy, and new audio appears in the game folder at once | Phase 5 |
+| 7 | Which WoW client "WoW Forever" runs | Modern Classic client (1.14+), original 1.12 client | Tell me which. A 1.12 client has no `GetQuestID`, so the addon would match quests by title instead | Phase 6 |
+| 8 | How the addon folder reaches the game | Directory junction from the repo, copy by hand | Junction. One copy, and new audio appears in the game folder at once | Phase 6 |
 
 ## Risks
 
@@ -279,7 +298,7 @@ The API runs on HTTP only (`http://localhost:5219`), because it's local and has 
 
 Once speech and quests work, these are the natural next steps:
 
-- A small local website to manage the quests and see what's happening: which have audio, which are missing, listen and regenerate. This is planned much later.
+- More in the quest viewer: regenerate audio, edit quest text, add quests
 - WoW's built-in text-to-speech as a fallback for quests without audio, with the addon saving missing quests and their text so the API can generate them (needs a modern client)
 - A voice for every NPC: race and gender pick the voice, built with SSML
 - `GET /api/voices` and comparing Dragon HD voices
@@ -296,8 +315,8 @@ Once speech and quests work, these are the natural next steps:
 
 ## Next step
 
-1. Phase 5.
-2. Answer decision 7 when you can: which client does "WoW Forever" run? It's needed by Phase 5.
+1. Phase 6: the addon.
+2. Answer decision 7: which client does "WoW Forever" run? It's needed by Phase 6.
 
 ## Notes
 

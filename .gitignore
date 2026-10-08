@@ -491,3 +491,5 @@ addon/WowTts/audio/
 # Local secrets
 .env
 
+# Local Claude app settings
+.claude/
