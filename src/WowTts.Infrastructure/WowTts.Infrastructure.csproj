@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.52.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.20" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.20" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.20" />
   </ItemGroup>

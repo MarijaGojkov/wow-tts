@@ -26,6 +26,29 @@ public sealed class FileAudioStore(IOptions<AudioStorageOptions> options, IHostE
         await File.WriteAllBytesAsync(GetPath(questId, part), audio);
     }
 
+    public void Delete(int questId, QuestPart part) => File.Delete(GetPath(questId, part));
+
+    // One directory listing instead of a File.Exists call per quest part.
+    public IReadOnlySet<AudioKey> ListAll()
+    {
+        var keys = new HashSet<AudioKey>();
+        if (!Directory.Exists(_folder))
+            return keys;
+
+        foreach (string file in Directory.EnumerateFiles(_folder, "*.mp3"))
+        {
+            // File names look like 783-accept.mp3.
+            string[] name = Path.GetFileNameWithoutExtension(file).Split('-');
+            if (name.Length == 2 && int.TryParse(name[0], out int questId)
+                && Enum.TryParse(name[1], ignoreCase: true, out QuestPart part))
+            {
+                keys.Add(new AudioKey(questId, part));
+            }
+        }
+
+        return keys;
+    }
+
     private string GetPath(int questId, QuestPart part) =>
         Path.Combine(_folder, $"{questId}-{part.ToString().ToLowerInvariant()}.mp3");
 }

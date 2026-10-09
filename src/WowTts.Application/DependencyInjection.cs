@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using WowTts.Application.Import;
+using WowTts.Application.Maps;
 using WowTts.Application.Quests;
 using WowTts.Application.Speech;
 
@@ -11,6 +13,9 @@ public static class DependencyInjection
     {
         services.AddScoped<SpeechService>();
         services.AddScoped<QuestService>();
+        services.AddScoped<QuestImportService>();
+        services.AddScoped<GameDataImportService>();
+        services.AddScoped<MapService>();
 
         return services;
     }

@@ -4,6 +4,7 @@ using Scalar.AspNetCore;
 using WowTts.Api.ErrorHandling;
 using WowTts.Application;
 using WowTts.Infrastructure;
+using WowTts.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,9 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 var app = builder.Build();
+
+// Creates data/wowtts.db and its tables the first time. Quests are added with tools/WowTts.Importer.
+await app.Services.EnsureDatabaseAsync();
 
 app.UseExceptionHandler();
 

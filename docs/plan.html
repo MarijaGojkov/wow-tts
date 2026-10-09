@@ -109,13 +109,13 @@ h1 span { color: var(--gold); }
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(11, minmax(0, 1fr));
   position: relative;
 }
 .track::before {
   content: "";
   position: absolute;
-  left: 7%; right: 7%;
+  left: 4.5%; right: 4.5%;
   top: 17px;
   height: 2px;
   background: var(--line);
@@ -147,7 +147,7 @@ h1 span { color: var(--gold); }
 .next .node { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 0 4px var(--gold-soft); }
 .next a { color: var(--ink); font-weight: 600; }
 @media (max-width: 520px) {
-  .track { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 20px; }
+  .track { grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: 20px; }
   .track::before { display: none; }
 }
 
@@ -427,7 +427,7 @@ td strong { font-weight: 600; }
       <div><dt>Updated</dt><dd>7 Oct 2026</dd></div>
       <div><dt>Repo</dt><dd>MarijaGojkov/wow-tts · private</dd></div>
       <div><dt>Stack</dt><dd>.NET 9 · Controllers · Speech SDK · Lua</dd></div>
-      <div><dt>Scope</dt><dd>Speech, quests, addon</dd></div>
+      <div><dt>Quests</dt><dd>4,221 imported from cMaNGOS</dd></div>
     </dl>
     <div class="notice">
       <strong>Kept simple on purpose</strong>
@@ -443,7 +443,11 @@ td strong { font-weight: 600; }
       <li class="done"><a href="#phase-3"><span class="node">3</span>Speech</a></li>
       <li class="done"><a href="#phase-4"><span class="node">4</span>Quests</a></li>
       <li class="done"><a href="#phase-5"><span class="node">5</span>Viewer</a></li>
-      <li class="next"><a href="#phase-6"><span class="node">6</span>Addon</a></li>
+      <li class="done"><a href="#phase-6"><span class="node">6</span>Database</a></li>
+      <li class="done"><a href="#phase-7"><span class="node">7</span>Zones</a></li>
+      <li class="done"><a href="#phase-8"><span class="node">8</span>Map</a></li>
+      <li class="next"><a href="#phase-9"><span class="node">9</span>Addon</a></li>
+      <li><a href="#phase-10"><span class="node">10</span>Captures</a></li>
     </ol>
   </nav>
 
@@ -506,7 +510,7 @@ td strong { font-weight: 600; }
       <div class="ring outer" role="img" aria-label="Onion diagram: Api and Infrastructure in the outer ring, Application in the middle, Domain at the core">
         <div class="outer-head">
           <div><div class="ring-name">Api</div><div class="ring-note">Controllers, errors, wiring</div></div>
-          <div><div class="ring-name">Infrastructure</div><div class="ring-note">Azure, files, quest JSON</div></div>
+          <div><div class="ring-name">Infrastructure</div><div class="ring-note">Azure, SQLite, files, importers</div></div>
         </div>
         <div class="ring mid">
           <div class="ring-name">Application</div>
@@ -529,7 +533,7 @@ td strong { font-weight: 600; }
         <tbody>
           <tr><td><strong>Domain</strong></td><td><code>Quest</code>, <code>QuestPart</code>, <code>TextCleaner</code>: the WoW rules</td><td>Nothing</td><td>No</td></tr>
           <tr><td><strong>Application</strong></td><td><code>SpeechService</code>, <code>QuestService</code>, the interfaces they need, DTOs</td><td>Domain</td><td>No</td></tr>
-          <tr><td><strong>Infrastructure</strong></td><td>Azure Speech SDK, audio files in the addon folder, quest JSON file</td><td>Application, Domain</td><td class="yes">Yes</td></tr>
+          <tr><td><strong>Infrastructure</strong></td><td>Azure Speech SDK, audio files in the addon folder, SQLite quest database, importers</td><td>Application, Domain</td><td class="yes">Yes</td></tr>
           <tr><td><strong>Api</strong></td><td>Controllers, error handling, OpenAPI, dependency injection setup</td><td>Application, Infrastructure</td><td>Only wires it</td></tr>
         </tbody>
       </table>
@@ -574,22 +578,24 @@ td strong { font-weight: 600; }
   <section id="layout">
     <div class="section-head">
       <p class="eyebrow">Structure</p>
-      <h2>Solution layout after Phase 6</h2>
+      <h2>Solution layout after Phase 8</h2>
     </div>
 <pre>wow-tts/
 ├─ WowTts.sln
 ├─ src/
 │  ├─ <span class="d">WowTts.Domain/</span>
-│  │  ├─ Quests/            <span class="c">Quest, QuestPart</span>
+│  │  ├─ Quests/            <span class="c">Quest, QuestPart, QuestSource</span>
 │  │  └─ Speech/            <span class="c">TextCleaner</span>
 │  ├─ <span class="d">WowTts.Application/</span>
 │  │  ├─ Abstractions/      <span class="c">ISpeechSynthesizer, IQuestRepository, IAudioStore</span>
 │  │  ├─ Speech/            <span class="c">SpeechService, SpeechRequest</span>
 │  │  ├─ Quests/            <span class="c">QuestService, QuestDto</span>
+│  │  ├─ Import/            <span class="c">QuestImportService, ImportResult</span>
 │  │  └─ DependencyInjection.cs
 │  ├─ <span class="d">WowTts.Infrastructure/</span>
 │  │  ├─ Speech/            <span class="c">AzureSpeechSynthesizer, SpeechOptions</span>
-│  │  ├─ Quests/            <span class="c">JsonQuestRepository</span>
+│  │  ├─ Persistence/       <span class="c">WowTtsDbContext, SqliteQuestRepository</span>
+│  │  ├─ Import/            <span class="c">MySqlDumpReader, CMangosQuestReader, SampleQuestReader</span>
 │  │  ├─ Storage/           <span class="c">FileAudioStore</span>
 │  │  └─ DependencyInjection.cs
 │  └─ <span class="d">WowTts.Api/</span>
@@ -598,12 +604,16 @@ td strong { font-weight: 600; }
 │     ├─ Program.cs
 │     ├─ appsettings.json
 │     └─ WowTts.Api.http    <span class="c">sample requests you can click to run</span>
+├─ <span class="d">tools/WowTts.Importer/</span>   <span class="c">console tool: imports quests into the database</span>
 ├─ <span class="d">web/</span>                     <span class="c">Quest Voices: React + Vite quest viewer</span>
 ├─ <span class="d">addon/WowTts/</span>            <span class="c">linked into Interface\AddOns\WowTts</span>
 │  ├─ WowTts.toc            <span class="c">addon name, version, files to load</span>
 │  ├─ WowTts.lua            <span class="c">plays audio when a quest window opens</span>
 │  └─ audio/                <span class="c">generated MP3s (git-ignored)</span>
-├─ data/sample-quests.json  <span class="c">5 hand-written test quests</span>
+├─ data/
+│  ├─ wowtts.db             <span class="c">SQLite database with all quests (git-ignored)</span>
+│  ├─ cmangos/              <span class="c">downloaded cMaNGOS dump (git-ignored)</span>
+│  └─ sample-quests.json    <span class="c">5 hand-written test quests</span>
 ├─ docs/plan.html
 ├─ PLAN.md
 └─ README.md</pre>
@@ -614,21 +624,35 @@ td strong { font-weight: 600; }
       <p class="eyebrow">Input</p>
       <h2>Quest data</h2>
     </div>
+    <p>WoW Forever has about 5,200 quests: roughly 3,600 unchanged vanilla quests, 616 changed and 1,001 new. The vanilla text comes from an open database, and Forever's own text is captured in game.</p>
+    <h3 class="sub">Where it comes from</h3>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
+        <thead><tr><th>Source</th><th>What it gives us</th><th>Covers</th></tr></thead>
         <tbody>
-          <tr><td><code>id</code></td><td>783</td><td>Quest ID, used in routes, file names and by the addon</td></tr>
-          <tr><td><code>title</code></td><td>A Threat Within</td><td>Not read aloud (decision 6)</td></tr>
-          <tr><td><code>npcName</code></td><td>Deputy Willem</td><td>Quest giver</td></tr>
-          <tr><td><code>npcRace</code></td><td>Human</td><td>Stored now, used later for NPC voices</td></tr>
-          <tr><td><code>npcGender</code></td><td>Male</td><td>Stored now, used later for NPC voices</td></tr>
-          <tr><td><code>acceptText</code></td><td>What the NPC says when you take the quest</td><td>Required</td></tr>
-          <tr><td><code>progressText</code></td><td>What the NPC says if you return early</td><td>Optional</td></tr>
-          <tr><td><code>completeText</code></td><td>What the NPC says when you hand it in</td><td>Optional</td></tr>
+          <tr><td><strong>cMaNGOS classic-db</strong><br>GPL-3, <code>ClassicDB_1_12_1_z2815.sql.gz</code></td><td>Full quest text (accept, progress, complete), quest givers, NPC names and gender. No NPC race</td><td>4,221 vanilla quests, most of Forever</td></tr>
+          <tr><td><strong>The game itself</strong> (Phase 8)</td><td>The exact Forever text, captured by the addon when you open a quest</td><td>Forever's new and changed quests</td></tr>
+          <tr><td><strong>sample-quests.json</strong></td><td>5 hand-written test quests</td><td>Testing</td></tr>
         </tbody>
       </table>
     </div>
+    <h3 class="sub">Where it's stored</h3>
+    <p>One SQLite file, <code>data/wowtts.db</code>, through Entity Framework Core. It's git-ignored, so the repo holds no Blizzard text. Audio stays as MP3 files in the addon folder, because the game can only play files.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Column</th><th>Example</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>Id</code></td><td>783</td><td>Quest ID, used in routes, file names and by the addon</td></tr>
+          <tr><td><code>Title</code></td><td>A Threat Within</td><td>Not read aloud</td></tr>
+          <tr><td><code>NpcName</code></td><td>Deputy Willem</td><td>Quest giver</td></tr>
+          <tr><td><code>NpcRace</code> · <code>NpcGender</code></td><td>Unknown · Male</td><td>Used later for NPC voices</td></tr>
+          <tr><td><code>AcceptText</code> · <code>ProgressText</code> · <code>CompleteText</code></td><td>What the NPC says at each step</td><td>At least one is needed</td></tr>
+          <tr><td><code>Source</code></td><td>CMangos</td><td>Sample, CMangos or Captured</td></tr>
+          <tr><td><code>UpdatedAt</code></td><td>2026-10-08</td><td>Last import that changed it</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>Which text wins:</strong> Captured beats CMangos, which beats Sample. When an import changes a quest's text, its old MP3s are deleted so they're regenerated.</p>
   </section>
 
   <section id="phases">
@@ -814,33 +838,148 @@ td strong { font-weight: 600; }
         </div>
       </article>
 
-      <article class="quest is-next" id="phase-6">
+      <article class="quest" id="phase-6">
         <header>
-          <h3><small>Phase 6</small>The addon</h3>
-          <span class="pill next">Next</span>
+          <h3><small>Phase 6</small>Quest database and cMaNGOS importer</h3>
+          <span class="pill done">Done</span>
         </header>
-        <p class="objective">Open a quest in game and hear it.</p>
+        <p class="objective">4,221 real quests in a SQLite database, imported from cMaNGOS with one command in about 1.3 seconds.</p>
         <div class="quest-body">
           <div>
             <p class="label">Objectives</p>
             <ul class="tasks">
-              <li>Create <code>addon/WowTts/</code> with <code>WowTts.toc</code> and <code>WowTts.lua</code>.</li>
-              <li>Link that folder into the game's <code>Interface\AddOns\WowTts</code> with a directory junction, so the repo and the game share one copy.</li>
-              <li>The API already saves the audio in <code>addon/WowTts/audio/</code>.</li>
-              <li><b class="l-lua">Lua</b>
+              <li class="checked"><b class="l-domain">Domain</b><code>QuestSource</code> on each quest. A quest needs at least one text, because 536 turn-in quests only have completion text.</li>
+              <li class="checked"><b class="l-app">Application</b><code>QuestImportService</code>: adds, updates, keeps higher-priority text, and deletes MP3s whose text changed.</li>
+              <li class="checked"><b class="l-infra">Infrastructure</b>
                 <ul>
-                  <li>listen for <code>QUEST_DETAIL</code> (accept), <code>QUEST_PROGRESS</code> (progress) and <code>QUEST_COMPLETE</code> (complete)</li>
-                  <li>get the quest ID and play <code>audio\&lt;id&gt;-&lt;part&gt;.mp3</code> with <code>PlaySoundFile</code></li>
-                  <li>stop the sound when the window closes (<code>QUEST_FINISHED</code>) or another quest opens</li>
+                  <li><code>WowTtsDbContext</code> and <code>SqliteQuestRepository</code> (EF Core), replacing the JSON file</li>
+                  <li><code>MySqlDumpReader</code>: reads tables straight from the <code>.sql.gz</code>, no MySQL needed</li>
+                  <li><code>CMangosQuestReader</code> and <code>SampleQuestReader</code></li>
                 </ul>
               </li>
-              <li>Give some sample quests IDs of real quests you can open in game, so the test works for real.</li>
+              <li class="checked"><b class="l-api">Importer</b><code>tools/WowTts.Importer</code> with <code>cmangos</code> and <code>samples</code> commands.</li>
+              <li class="checked"><b class="l-api">Viewer</b>shows where each quest's text came from.</li>
             </ul>
           </div>
           <div class="side">
-            <div><p class="label">Complete when</p><p>You generate a quest's audio, start the game, open that quest and hear it. Closing the window stops it.</p></div>
-            <div><p class="label">Skills</p><div class="chips"><span class="chip">Addon .toc</span><span class="chip">Lua events</span><span class="chip">PlaySoundFile</span><span class="chip">StopSound</span></div></div>
-            <div><p class="label">Commit</p><p class="commit">Add WoW addon that plays quest audio</p></div>
+            <div><p class="label">Complete when</p>
+              <ul>
+                <li>✓ One run fills the database (3.4 MB)</li>
+                <li>✓ A second run reports all 4,221 unchanged</li>
+                <li>✓ The viewer shows all quests in about 1.2 s</li>
+              </ul>
+            </div>
+            <div><p class="label">Skills</p><div class="chips"><span class="chip">EF Core + SQLite</span><span class="chip">Parsing a SQL dump</span><span class="chip">Generic Host</span><span class="chip">Upserts</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Add SQLite quest database and cMaNGOS importer</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-7">
+        <header>
+          <h3><small>Phase 7</small>Zones, levels and paging</h3>
+          <span class="pill done">Done</span>
+        </header>
+        <p class="objective">Every quest knows its zone, level and faction, and Quest Voices stays fast with 4,000+ quests.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li class="checked"><b class="l-api">Importer</b><code>gamedata</code> command: Classic Era <code>AreaTable</code>, <code>QuestSort</code>, <code>UiMap</code> and <code>UiMapAssignment</code> from wago.tools. 2 continents, 49 zones, 1,248 quest log headers.</li>
+              <li class="checked"><b class="l-api">cMaNGOS</b>adds level, faction, quest log category and the quest giver's world position.</li>
+              <li class="checked"><b class="l-domain">Domain</b><code>MapZone</code> turns a world position into a map position, the way the game does. Deputy Willem: 48.2, 42.9 in Elwynn Forest.</li>
+              <li class="checked"><b class="l-api">API</b><code>GET /api/quests</code> returns summaries with search, filters and paging. New <code>/stats</code>, <code>/categories</code> and <code>/api/map/zones</code>.</li>
+              <li class="checked"><b class="l-api">Viewer</b>zone, faction and level filters, level badges in faction colours, and more quests load as you scroll.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p>
+              <ul>
+                <li>✓ Searches take 50–180 ms</li>
+                <li>✓ Elwynn Forest filter: 73 quests</li>
+                <li>✓ Generating audio updates the list and totals</li>
+              </ul>
+            </div>
+            <div><p class="label">Commit</p><p class="commit">Add zones, levels and paging</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-8">
+        <header>
+          <h3><small>Phase 8</small>Interactive world map</h3>
+          <span class="pill done">Done</span>
+        </header>
+        <p class="objective">A clickable map in Quest Voices. Click a zone to list its quests, and see each quest giver where they stand.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li class="checked"><b class="l-api">Layout</b>full width: quest list, map and quest side by side from 1400 px; tabs below that.</li>
+              <li class="checked"><b class="l-api">API</b><code>GET /api/map/markers</code>: every matching quest giver as a point on a continent or zone map. Eastern Kingdoms: 1,979 quests at 596 spots in 0.1 s.</li>
+              <li class="checked">Continent view cropped to its zones. Clickable zones with quest counts, cities as diamonds, all quest givers as dots in faction colours.</li>
+              <li class="checked">Zone view: one dot per spot. Hover for the NPC's quests, click to open one. The selected quest gets a ring, and clicking a zone filters the list.</li>
+              <li class="checked"><b class="l-api">Images</b>the importer's <code>mapimages</code> command builds the real WoW maps from the game's own tiles (via wago.tools): 1,424 BLP tiles decoded, 526 explored-area overlays added, 51 maps in about a minute.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p>
+              <ul>
+                <li>✓ Clicking Elwynn Forest lists its 73 quests</li>
+                <li>✓ Deputy Willem's dot shows his 5 quests</li>
+                <li>✓ Real map images, aligned with the dots</li>
+              </ul>
+            </div>
+            <div><p class="label">Commit</p><p class="commit">Add interactive world map</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest is-next" id="phase-9">
+        <header>
+          <h3><small>Phase 9</small>The addon</h3>
+          <span class="pill next">Next</span>
+        </header>
+        <p class="objective">Open a quest in game and hear it. Quests without audio are saved, so the API can add them.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li>Create <code>addon/WowTts/</code> with <code>WowTts.toc</code> and <code>WowTts.lua</code>, linked into <code>Interface\AddOns\WowTts</code> with a directory junction.</li>
+              <li><b class="l-lua">Lua</b>
+                <ul>
+                  <li>listen for <code>QUEST_DETAIL</code>, <code>QUEST_PROGRESS</code> and <code>QUEST_COMPLETE</code></li>
+                  <li>play <code>audio\&lt;id&gt;-&lt;part&gt;.mp3</code> with <code>PlaySoundFile</code>, stop it on <code>QUEST_FINISHED</code></li>
+                  <li>save each quest's ID, title, text and NPC in the addon's saved data, with your name turned back into <code>$N</code></li>
+                  <li>optional: read quests without audio aloud with WoW's built-in text-to-speech</li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p>You open a quest in game and hear it, and quests you open are saved after a <code>/reload</code>.</p></div>
+            <div><p class="label">Skills</p><div class="chips"><span class="chip">Addon .toc</span><span class="chip">Lua events</span><span class="chip">PlaySoundFile</span><span class="chip">SavedVariables</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Add WoW addon that plays and captures quests</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-10">
+        <header>
+          <h3><small>Phase 10</small>Import captured Forever quests</h3>
+          <span class="pill">Planned</span>
+        </header>
+        <p class="objective">Quests saved by the addon end up in the database with source Captured.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li>Importer command <code>captured [path]</code> reading <code>WTF\Account\&lt;ACCOUNT&gt;\SavedVariables\WowTts.lua</code>.</li>
+              <li>Captured text replaces cMaNGOS text for the same quest, and its old audio is deleted.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Commit</p><p class="commit">Import quests captured in game</p></div>
           </div>
         </div>
       </article>
@@ -870,6 +1009,14 @@ td strong { font-weight: 600; }
           <tr><td>Player placeholders</td><td>Generic words: adventurer, traveler, hero. <code>$G</code> takes the first form</td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>Quest title</td><td>Not read aloud</td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>How the addon gets audio</td><td>The API writes MP3s into the addon folder. The addon only plays local files</td><td class="nowrap">7 Oct 2026</td></tr>
+          <tr><td>Game</td><td>World of Warcraft: Forever. It runs a modern client (1.60.x), so the addon can use <code>GetQuestID</code></td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Quest data source</td><td>cMaNGOS classic-db for vanilla quests, plus quests captured in game</td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Quest storage</td><td>SQLite file <code>data/wowtts.db</code> through EF Core, git-ignored</td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Importer</td><td>Console tool <code>tools/WowTts.Importer</code></td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Text priority</td><td>Captured &gt; CMangos &gt; Sample. Changed text deletes the old MP3s</td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Zone and map data</td><td>Classic Era client tables from wago.tools: <code>AreaTable</code>, <code>QuestSort</code>, <code>UiMap</code>, <code>UiMapAssignment</code></td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Map style</td><td>Real WoW map images as background, built by the importer from the game's own map tiles (via wago.tools). No downloading from Wowhead</td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Ready-made audio packs</td><td>Not used: no clear license, and voice-cloned from Blizzard audio. Audio is generated on demand</td><td class="nowrap">8 Oct 2026</td></tr>
         </tbody>
       </table>
     </div>
@@ -878,8 +1025,10 @@ td strong { font-weight: 600; }
       <table>
         <thead><tr><th>#</th><th>Decision</th><th>Options</th><th>Suggestion</th><th>Needed by</th></tr></thead>
         <tbody>
-          <tr><td class="num">7</td><td>Which WoW client "WoW Forever" runs</td><td>Modern Classic client (1.14+), original 1.12 client</td><td>Tell me which. A 1.12 client has no <code>GetQuestID</code>, so the addon would match quests by title</td><td class="when">Phase 6</td></tr>
-          <tr><td class="num">8</td><td>How the addon folder reaches the game</td><td>Directory junction from the repo, copy by hand</td><td>Junction. One copy, and new audio appears in the game folder at once</td><td class="when">Phase 6</td></tr>
+          <tr><td class="num">8</td><td>How the addon folder reaches the game</td><td>Directory junction from the repo, copy by hand</td><td>Junction. One copy, and new audio appears in the game folder at once</td><td class="when">Phase 8</td></tr>
+          <tr><td class="num">9</td><td>NPC race for imported quests</td><td>Leave as Unknown, or read it from the game's client data</td><td>Unknown for now. Only needed for voices per race</td><td class="when">Later</td></tr>
+          <tr><td class="num">11</td><td>Where Forever is installed</td><td>No WoW install was found on this PC</td><td>Install it here, or tell me where it is. Needed for the addon</td><td class="when">Phase 9</td></tr>
+          <tr><td class="num">10</td><td>Who speaks the progress and complete text</td><td>The quest giver (now), or the NPC you hand it in to</td><td>Store both NPCs. E.g. 783 is given by Deputy Willem but handed in to Marshal McBride</td><td class="when">NPC voices</td></tr>
         </tbody>
       </table>
     </div>
@@ -899,8 +1048,11 @@ td strong { font-weight: 600; }
           <tr><td>Placeholders get read aloud ("dollar N")</td><td><code>TextCleaner</code> handles them in the Domain layer</td></tr>
           <tr><td>The addon expects to call the API</td><td>It can't. The API writes files, the addon only plays them</td></tr>
           <tr><td>New audio isn't found in game</td><td>WoW only sees files that existed at startup. Generate first, then start the game</td></tr>
-          <tr><td>The game client is too old for <code>GetQuestID</code></td><td>Decision 7. Fall back to matching by quest title</td></tr>
-          <tr><td>Quest text belongs to Blizzard</td><td>Sample quests are hand-written. The repo stays private</td></tr>
+          <tr><td>Forever changed 616 quests, so cMaNGOS text is outdated for them</td><td>The addon captures Forever's own text, and captured text wins</td></tr>
+          <tr><td>wago.tools has no Forever data yet, so zones and maps are Classic Era's</td><td>Forever's 3 new zones come from the addon's captures. Re-import once Forever's tables appear</td></tr>
+          <tr><td>Old audio no longer matches changed text</td><td>Imports delete the MP3s of every part whose text changed</td></tr>
+          <tr><td>Fixes in cMaNGOS's <code>Updates</code> folder aren't in the full dump</td><td>Quest text rarely changes there. Re-download the newest dump now and then</td></tr>
+          <tr><td>Quest text belongs to Blizzard</td><td>Personal, private project. The database and dump are git-ignored</td></tr>
           <tr><td>The Speech key leaks</td><td>Key only in environment variables, never in a file</td></tr>
         </tbody>
       </table>
@@ -914,12 +1066,10 @@ td strong { font-weight: 600; }
         <h2>Later</h2>
         <ul>
           <li>More in the quest viewer: regenerate audio, edit quest text, add quests</li>
-          <li>WoW's built-in text-to-speech as a fallback for quests without audio, with the addon saving missing quests so the API can generate them</li>
           <li>A voice for every NPC: race and gender pick the voice, built with SSML</li>
           <li><code>GET /api/voices</code> and comparing Dragon HD voices</li>
           <li>Generating audio for all quests in one request, then batch jobs with a cost estimate</li>
           <li>Tests: Domain unit tests, API tests with a fake synthesizer</li>
-          <li>Real quest data for the WoW version you play</li>
           <li>Deploying to Azure: App Service, Key Vault, managed identity, plus authentication</li>
         </ul>
       </div>
@@ -937,10 +1087,10 @@ td strong { font-weight: 600; }
 
   <section class="next-step" id="next">
     <p class="eyebrow">Next step</p>
-    <h2>Phase 6: The addon</h2>
+    <h2>Phase 9: The addon</h2>
     <ol>
-      <li>Answer decision 7: which client does "WoW Forever" run?</li>
-      <li>Start Phase 6.</li>
+      <li>Decision 11: where Forever is installed, for the addon.</li>
+      <li>Build the addon that plays and captures quests in game.</li>
     </ol>
   </section>
 

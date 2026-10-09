@@ -8,14 +8,31 @@ namespace WowTts.Api.Controllers;
 [Route("api/quests")]
 public sealed class QuestsController(QuestService questService) : ControllerBase
 {
-    // Lists all quests, with the text of each part and whether its audio exists yet.
+    // One page of quests, without their text. Every filter is optional, e.g.
+    // /api/quests?search=kobold&categoryId=12&side=alliance&audio=missing&page=1&pageSize=50
     [HttpGet]
-    public async Task<IReadOnlyList<QuestDto>> GetAll()
+    [ProducesResponseType(typeof(QuestSearchResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    public async Task<QuestSearchResult> Search([FromQuery] QuestQuery query)
     {
-        return await questService.GetAllAsync();
+        return await questService.SearchAsync(query);
     }
 
-    // One quest's details.
+    // How many quests and quest parts there are, and how many parts have audio.
+    [HttpGet("stats")]
+    public async Task<QuestStatsDto> GetStats()
+    {
+        return await questService.GetStatsAsync();
+    }
+
+    // The quest log headers (zones, dungeons and categories such as Seasonal) with their quest counts.
+    [HttpGet("categories")]
+    public async Task<IReadOnlyList<QuestCategoryDto>> GetCategories()
+    {
+        return await questService.GetCategoriesAsync();
+    }
+
+    // One quest with all its text.
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(QuestDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]

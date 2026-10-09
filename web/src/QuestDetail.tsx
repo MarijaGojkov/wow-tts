@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { audioUrl, generateAudio, type Quest, type QuestPartInfo } from './api'
-import { errorText, partLabels, splitWords } from './labels'
+import { audioCount, errorText, partLabels, sideLabels, sourceLabels, splitWords } from './labels'
 
 interface QuestDetailProps {
   quest: Quest
@@ -23,23 +23,45 @@ export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
         </a>
       </header>
 
-      <section className="npc" aria-label="Quest giver">
+      <section className="npc" aria-label="Quest details">
         <div>
           <p className="label">Quest giver</p>
           <p className="npc-name">{quest.npcName}</p>
+          <p className="sub">
+            {[quest.npcGender, quest.npcRace].filter((value) => value !== 'Unknown').map(splitWords).join(' ') ||
+              'Gender unknown'}
+          </p>
         </div>
         <div>
-          <p className="label">Race</p>
-          <p>{splitWords(quest.npcRace)}</p>
+          <p className="label">Where</p>
+          <p>{quest.mapZoneName ?? 'Unknown'}</p>
+          {quest.mapPosition && (
+            <p className="sub">
+              {quest.mapPosition.x.toFixed(1)}, {quest.mapPosition.y.toFixed(1)}
+            </p>
+          )}
         </div>
         <div>
-          <p className="label">Gender</p>
-          <p>{quest.npcGender}</p>
+          <p className="label">Level</p>
+          <p>{quest.level ?? 'Scales'}</p>
+          {quest.minLevel !== null && <p className="sub">Requires {quest.minLevel}</p>}
+        </div>
+        <div>
+          <p className="label">Faction</p>
+          <p className={`side-text side-${quest.side}`}>{sideLabels[quest.side]}</p>
+        </div>
+        <div>
+          <p className="label">Quest log</p>
+          <p>{quest.categoryName ?? 'Unknown'}</p>
+        </div>
+        <div>
+          <p className="label">Text from</p>
+          <p>{sourceLabels[quest.source] ?? quest.source}</p>
         </div>
         <div>
           <p className="label">Audio</p>
           <p>
-            {quest.parts.filter((part) => part.hasAudio).length} of {quest.parts.length} parts
+            {audioCount(quest.parts)} of {quest.parts.length} parts
           </p>
         </div>
       </section>

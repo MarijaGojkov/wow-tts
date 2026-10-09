@@ -12,6 +12,14 @@
   --ok-soft: rgba(110, 194, 143, 0.14);
   --danger: #f08a7e;
   --danger-soft: rgba(240, 138, 126, 0.12);
+  --alliance: #7fa8f0;
+  --alliance-soft: rgba(127, 168, 240, 0.14);
+  --horde: #e57b6c;
+  --horde-soft: rgba(229, 123, 108, 0.14);
+  --map-sea: #0d1420;
+  --map-grid: #18222f;
+  --map-land: #1e2a24;
+  --map-land-edge: #2b3a31;
   --f-display: 'Cinzel', 'Trajan Pro', Georgia, serif;
   --f-body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
   --f-mono: 'IBM Plex Mono', Consolas, monospace;
@@ -65,13 +73,12 @@ a:focus-visible {
   color: var(--muted);
 }
 
+/* The app uses the full width of the window. */
 .app {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 28px 20px 48px;
+  padding: 18px 24px 32px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
 }
 
 /* Header */
@@ -79,8 +86,8 @@ a:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 16px 32px;
-  padding-bottom: 20px;
+  gap: 12px 32px;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -129,15 +136,65 @@ h1 {
   border-color: var(--muted);
 }
 
-/* Layout */
+/* Layout: quest list on the left, then the workspace with the map and the quest.
+   From 1400px wide the map and the quest sit side by side; below that, tabs switch between them. */
 .layout {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 20px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.view-tab {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 16px;
+  color: var(--muted);
+}
+
+.view-tab.active {
+  background: var(--gold-soft);
+  border-color: transparent;
+  color: var(--gold);
+}
+
+.workspace.show-quest .map-pane,
+.workspace.show-map .content {
+  display: none;
+}
+
+@media (min-width: 1400px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .view-tabs {
+    display: none;
+  }
+
+  .workspace.show-quest .map-pane,
+  .workspace.show-map .content {
+    display: block;
+  }
 }
 
 /* On wide screens the page itself never scrolls: the header stays put,
-   and the quest list and the quest detail each scroll on their own. */
+   and the quest list, the map and the quest each scroll on their own. */
 @media (min-width: 821px) {
   html {
     scrollbar-gutter: auto;
@@ -145,7 +202,7 @@ h1 {
 
   .app {
     height: 100dvh;
-    padding-bottom: 20px;
+    padding-bottom: 18px;
   }
 
   .layout {
@@ -155,11 +212,16 @@ h1 {
 
   .sidebar {
     min-height: 0;
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(0, 1fr);
   }
 
-  .quest-list,
-  .content {
+  .workspace {
+    min-height: 0;
+  }
+
+  .list-scroll,
+  .content,
+  .map-pane {
     min-height: 0;
     overflow-y: auto;
     scrollbar-gutter: stable;
@@ -174,6 +236,316 @@ h1 {
   .stats {
     margin-left: 0;
   }
+}
+
+/* World map */
+.world-map {
+  display: grid;
+  gap: 10px;
+}
+
+.map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.map-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.map-tab {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.map-tab.active {
+  background: var(--gold-soft);
+  border-color: transparent;
+  color: var(--gold);
+}
+
+.map-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.map-title strong {
+  font-family: var(--f-display);
+  font-size: 1.15rem;
+  color: var(--gold);
+}
+
+.map-count {
+  font-family: var(--f-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.map-back {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.map-back:hover {
+  color: var(--ink);
+}
+
+/* As wide as the pane, but never taller than the window allows: the width follows the map's shape. */
+.map-frame {
+  position: relative;
+  width: min(100%, calc((100dvh - 240px) * var(--map-ratio, 1.5)));
+  margin-inline: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--map-sea);
+}
+
+@media (max-width: 820px) {
+  .map-frame {
+    width: 100%;
+  }
+}
+
+.map-frame.stale {
+  opacity: 0.6;
+}
+
+.map-frame svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.drawn .sea {
+  fill: var(--map-sea);
+}
+
+.drawn .grid {
+  stroke: var(--map-grid);
+  stroke-width: 1;
+}
+
+.drawn .land {
+  fill: var(--map-land);
+  stroke: var(--map-land-edge);
+  stroke-width: 1.5;
+}
+
+.drawn .watermark {
+  fill: var(--map-grid);
+  font-family: var(--f-display);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.zone-area {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 3;
+  cursor: pointer;
+}
+
+.zone-area.hover {
+  fill: var(--gold-soft);
+  stroke: var(--gold);
+}
+
+.zone-label {
+  cursor: pointer;
+}
+
+.zone-label rect {
+  fill: rgba(18, 21, 27, 0.72);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.zone-label text {
+  fill: var(--ink);
+  font-family: var(--f-body);
+  font-weight: 600;
+}
+
+.zone-label .zone-count {
+  fill: var(--muted);
+  font-weight: 400;
+}
+
+.zone-label .city-mark {
+  fill: var(--gold);
+  stroke: rgba(10, 12, 16, 0.9);
+  stroke-width: 2;
+}
+
+.zone-label.city.hover .city-mark {
+  fill: var(--ink);
+}
+
+.zone-label.hover rect {
+  stroke: var(--gold);
+}
+
+.zone-label.hover text {
+  fill: var(--gold);
+}
+
+.marker {
+  stroke: rgba(10, 12, 16, 0.9);
+  stroke-width: 2;
+  cursor: pointer;
+}
+
+.markers.small .marker {
+  stroke-width: 0;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.marker.side-alliance {
+  fill: var(--alliance);
+}
+
+.marker.side-horde {
+  fill: var(--horde);
+}
+
+.marker.side-both {
+  fill: var(--gold);
+}
+
+.marker.active {
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.selected-ring {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-dasharray: 6 5;
+  pointer-events: none;
+}
+
+.map-popup {
+  position: absolute;
+  transform: translate(14px, -50%);
+  width: 290px;
+  max-height: 60%;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 2;
+}
+
+.map-popup.left {
+  transform: translate(calc(-100% - 14px), -50%);
+}
+
+.map-popup-npc {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.map-popup ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.map-popup li button {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 6px;
+  color: var(--gold);
+  font-size: 0.88rem;
+}
+
+.map-popup li button:hover,
+.map-popup li button.selected {
+  background: var(--panel-2);
+}
+
+.map-popup-audio {
+  margin-left: auto;
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.map-popup-close {
+  margin-top: 6px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.swatch.side-alliance {
+  background: var(--alliance);
+}
+
+.swatch.side-horde {
+  background: var(--horde);
+}
+
+.swatch.side-both {
+  background: var(--gold);
+}
+
+.map-hint {
+  margin-left: auto;
+}
+
+.map-empty {
+  padding: 24px;
+  color: var(--muted);
 }
 
 /* Sidebar */
@@ -241,8 +613,95 @@ h1 {
 }
 
 .quest-row-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-weight: 600;
   color: var(--gold);
+}
+
+/* Quest level, coloured by faction: blue for Alliance, red for Horde, grey for both. */
+.level {
+  flex: none;
+  min-width: 26px;
+  text-align: center;
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  color: var(--muted);
+}
+
+.level.side-alliance {
+  background: var(--alliance-soft);
+  color: var(--alliance);
+}
+
+.level.side-horde {
+  background: var(--horde-soft);
+  color: var(--horde);
+}
+
+.side-text.side-alliance {
+  color: var(--alliance);
+}
+
+.side-text.side-horde {
+  color: var(--horde);
+}
+
+.quest-row-where {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selects {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+
+.selects select {
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 8px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.result-count {
+  font-family: var(--f-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.list-scroll.stale {
+  opacity: 0.55;
+}
+
+.sentinel {
+  padding: 8px 12px 16px;
+}
+
+.load-more {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.load-more:hover {
+  color: var(--ink);
 }
 
 .quest-row-meta {
@@ -327,6 +786,11 @@ h2 {
 
 .npc-name {
   font-weight: 600;
+}
+
+.npc .sub {
+  font-size: 0.82rem;
+  color: var(--muted);
 }
 
 .parts {

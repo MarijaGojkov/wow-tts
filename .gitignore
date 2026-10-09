@@ -491,5 +491,15 @@ addon/WowTts/audio/
 # Local secrets
 .env
 
+# Quest database and downloaded cMaNGOS dump
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/cmangos/
+data/gamedata/
+
+# World map images: Blizzard's art, made by the importer's mapimages command
+web/public/maps/
+
 # Local Claude app settings
 .claude/

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using WowTts.Application.Abstractions;
 using WowTts.Application.Exceptions;
+using WowTts.Domain.Maps;
 using WowTts.Domain.Quests;
 using WowTts.Domain.Speech;
 
@@ -8,19 +9,124 @@ namespace WowTts.Application.Quests;
 
 public sealed class QuestService(
     IQuestRepository quests,
+    IGameDataRepository gameData,
     IAudioStore audioStore,
     ISpeechSynthesizer synthesizer,
     ILogger<QuestService> logger)
 {
-    public async Task<IReadOnlyList<QuestDto>> GetAllAsync()
+    public const int MaxPageSize = 500;
+
+    // One page of quests matching the query, ordered by level and then title.
+    public async Task<QuestSearchResult> SearchAsync(QuestQuery query)
     {
+        if (query.Page < 1 || query.PageSize < 1 || query.PageSize > MaxPageSize)
+            throw new InvalidRequestException($"Page must be 1 or more, and page size between 1 and {MaxPageSize}.");
+
+        Lookup lookup = await LoadLookupAsync();
         var all = await quests.GetAllAsync();
-        return all.Select(ToDto).ToList();
+
+        var matches = all
+            .Select(quest => (Quest: quest, Zone: lookup.ZoneOf(quest)))
+            .Where(row => Matches(row.Quest, row.Zone, query, lookup))
+            .OrderBy(row => row.Quest.Level ?? int.MaxValue)
+            .ThenBy(row => row.Quest.Title)
+            .ToList();
+
+        var items = matches
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(row => ToSummary(row.Quest, row.Zone, lookup))
+            .ToList();
+
+        return new QuestSearchResult(items, matches.Count, query.Page, query.PageSize);
+    }
+
+    // Every matching quest giver on one map (query.MapZoneId), with their position on that map.
+    // Uses the same filters as SearchAsync, but returns all matches without paging.
+    public async Task<IReadOnlyList<MapMarkerDto>> GetMarkersAsync(QuestQuery query)
+    {
+        if (query.MapZoneId is not int mapId)
+            throw new InvalidRequestException("Choose a map with mapZoneId, e.g. 1415 (Eastern Kingdoms) or 1429 (Elwynn Forest).");
+
+        Lookup lookup = await LoadLookupAsync();
+        MapZone map = lookup.Zones.FirstOrDefault(zone => zone.Id == mapId)
+            ?? throw new NotFoundException($"There's no map with ID {mapId}.");
+
+        var all = await quests.GetAllAsync();
+
+        return all
+            .Select(quest => (Quest: quest, Zone: lookup.ZoneOf(quest)))
+            .Where(row => row.Quest.GiverLocation is WorldLocation location
+                && map.Contains(location)
+                && Matches(row.Quest, row.Zone, query, lookup))
+            .Select(row =>
+            {
+                var parts = Enum.GetValues<QuestPart>().Where(row.Quest.HasText).ToList();
+                return new MapMarkerDto(
+                    row.Quest.Id, row.Quest.Title, row.Quest.NpcName, row.Quest.Level, row.Quest.Side,
+                    row.Zone?.Id,
+                    Round(map.ToMapPoint(row.Quest.GiverLocation!.Value)),
+                    parts.Count,
+                    parts.Count(part => lookup.SavedAudio.Contains(new AudioKey(row.Quest.Id, part))));
+            })
+            .ToList();
     }
 
     public async Task<QuestDto> GetAsync(int id)
     {
-        return ToDto(await GetQuestAsync(id));
+        Lookup lookup = await LoadLookupAsync();
+        Quest quest = await GetQuestAsync(id);
+        MapZone? zone = lookup.ZoneOf(quest);
+
+        var parts = Enum.GetValues<QuestPart>()
+            .Where(quest.HasText)
+            .Select(part => new QuestPartDto(
+                part,
+                TextCleaner.Clean(quest.GetText(part)!),
+                lookup.SavedAudio.Contains(new AudioKey(quest.Id, part))))
+            .ToList();
+
+        return new QuestDto(
+            quest.Id, quest.Title, quest.NpcName, quest.NpcRace, quest.NpcGender, quest.Source,
+            quest.Level, quest.MinLevel, quest.Side,
+            quest.CategoryId, lookup.CategoryName(quest.CategoryId),
+            zone?.Id, zone?.Name, MapPosition(quest, zone),
+            parts);
+    }
+
+    public async Task<QuestStatsDto> GetStatsAsync()
+    {
+        var all = await quests.GetAllAsync();
+        var saved = audioStore.ListAll();
+        int parts = 0, withAudio = 0;
+
+        foreach (Quest quest in all)
+        {
+            foreach (QuestPart part in Enum.GetValues<QuestPart>().Where(quest.HasText))
+            {
+                parts++;
+                if (saved.Contains(new AudioKey(quest.Id, part)))
+                    withAudio++;
+            }
+        }
+
+        return new QuestStatsDto(all.Count, parts, withAudio);
+    }
+
+    // The quest log headers that have quests, zones first, each sorted by name.
+    public async Task<IReadOnlyList<QuestCategoryDto>> GetCategoriesAsync()
+    {
+        Lookup lookup = await LoadLookupAsync();
+        var all = await quests.GetAllAsync();
+
+        return all
+            .Where(quest => quest.CategoryId is not null)
+            .GroupBy(quest => quest.CategoryId!.Value)
+            .Select(group => new QuestCategoryDto(
+                group.Key, lookup.CategoryName(group.Key) ?? $"Unknown ({group.Key})", group.Key > 0, group.Count()))
+            .OrderByDescending(category => category.IsZone)
+            .ThenBy(category => category.Name)
+            .ToList();
     }
 
     // Returns the quest part's audio. It's generated with Azure the first time, then read from the saved file,
@@ -60,16 +166,84 @@ public sealed class QuestService(
             ?? throw new NotFoundException($"There's no quest with ID {id}.");
     }
 
-    private QuestDto ToDto(Quest quest)
-    {
-        var parts = Enum.GetValues<QuestPart>()
-            .Where(quest.HasText)
-            .Select(part => new QuestPartDto(
-                part,
-                TextCleaner.Clean(quest.GetText(part)!),
-                audioStore.Exists(quest.Id, part)))
-            .ToList();
+    private async Task<Lookup> LoadLookupAsync() => new(
+        await gameData.GetMapZonesAsync(),
+        await gameData.GetCategoryNamesAsync(),
+        audioStore.ListAll());
 
-        return new QuestDto(quest.Id, quest.Title, quest.NpcName, quest.NpcRace, quest.NpcGender, parts);
+    private static bool Matches(Quest quest, MapZone? zone, QuestQuery query, Lookup lookup)
+    {
+        if (query.CategoryId is int categoryId && quest.CategoryId != categoryId)
+            return false;
+
+        // A continent matches every quest whose giver stands in one of its zones.
+        if (query.MapZoneId is int mapZoneId && zone?.Id != mapZoneId && zone?.ParentId != mapZoneId)
+            return false;
+
+        if (query.Source is QuestSource source && quest.Source != source)
+            return false;
+
+        if (query.Side is QuestSide side && side != QuestSide.Both && quest.Side != side && quest.Side != QuestSide.Both)
+            return false;
+
+        if (query.MinLevel is int minLevel && (quest.Level ?? 0) < minLevel)
+            return false;
+
+        if (query.MaxLevel is int maxLevel && (quest.Level ?? int.MaxValue) > maxLevel)
+            return false;
+
+        if (query.Audio != AudioFilter.All)
+        {
+            var parts = Enum.GetValues<QuestPart>().Where(quest.HasText).ToList();
+            int withAudio = parts.Count(part => lookup.SavedAudio.Contains(new AudioKey(quest.Id, part)));
+
+            if (query.Audio == AudioFilter.Done && withAudio == 0)
+                return false;
+            if (query.Audio == AudioFilter.Missing && withAudio == parts.Count)
+                return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            string term = query.Search.Trim();
+            bool found = quest.Id.ToString() == term
+                || quest.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || quest.NpcName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || (lookup.CategoryName(quest.CategoryId)?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false);
+
+            if (!found)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static QuestSummaryDto ToSummary(Quest quest, MapZone? zone, Lookup lookup) => new(
+        quest.Id, quest.Title, quest.NpcName, quest.Source, quest.Level, quest.MinLevel, quest.Side,
+        quest.CategoryId, lookup.CategoryName(quest.CategoryId),
+        zone?.Id, zone?.Name, MapPosition(quest, zone),
+        Enum.GetValues<QuestPart>()
+            .Where(quest.HasText)
+            .Select(part => new QuestPartStatusDto(part, lookup.SavedAudio.Contains(new AudioKey(quest.Id, part))))
+            .ToList());
+
+    private static MapPoint? MapPosition(Quest quest, MapZone? zone) =>
+        zone is not null && quest.GiverLocation is WorldLocation location
+            ? Round(zone.ToMapPoint(location))
+            : null;
+
+    private static MapPoint Round(MapPoint point) => new(Math.Round(point.X, 1), Math.Round(point.Y, 1));
+
+    // Game data and saved audio, loaded once per request.
+    private sealed record Lookup(
+        IReadOnlyList<MapZone> Zones,
+        IReadOnlyDictionary<int, string> CategoryNames,
+        IReadOnlySet<AudioKey> SavedAudio)
+    {
+        public MapZone? ZoneOf(Quest quest) =>
+            quest.GiverLocation is WorldLocation location ? MapZone.FindZone(Zones, location) : null;
+
+        public string? CategoryName(int? id) =>
+            id is int key && CategoryNames.TryGetValue(key, out string? name) ? name : null;
     }
 }

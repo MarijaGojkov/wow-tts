@@ -1,7 +1,10 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using WowTts.Application.Abstractions;
-using WowTts.Infrastructure.Quests;
+using WowTts.Infrastructure.Persistence;
 using WowTts.Infrastructure.Speech;
 using WowTts.Infrastructure.Storage;
 
@@ -28,8 +31,17 @@ public static class DependencyInjection
 
         services.AddSingleton<ISpeechSynthesizer, AzureSpeechSynthesizer>();
 
-        services.Configure<QuestDataOptions>(configuration.GetSection(QuestDataOptions.SectionName));
-        services.AddSingleton<IQuestRepository, JsonQuestRepository>();
+        // Quests live in a SQLite file. Its path in appsettings.json is relative to the app's project folder.
+        services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));
+        services.AddDbContext<WowTtsDbContext>((provider, options) =>
+        {
+            var environment = provider.GetRequiredService<IHostEnvironment>();
+            string file = provider.GetRequiredService<IOptions<DatabaseOptions>>().Value.File;
+            string path = Path.GetFullPath(Path.Combine(environment.ContentRootPath, file));
+            options.UseSqlite($"Data Source={path}");
+        });
+        services.AddScoped<IQuestRepository, SqliteQuestRepository>();
+        services.AddScoped<IGameDataRepository, SqliteGameDataRepository>();
 
         services.Configure<AudioStorageOptions>(configuration.GetSection(AudioStorageOptions.SectionName));
         services.AddSingleton<IAudioStore, FileAudioStore>();
