@@ -27,6 +27,20 @@ setx SPEECH_REGION "eastus"
 
 Open a new terminal after running `setx`.
 
+### AI voice director (optional)
+
+When you generate a quest's audio, a GPT model on Azure OpenAI picks the voice for the NPC and how each line is spoken (style such as angry or whispering, its strength, speed and pitch). Set these three variables to turn it on:
+
+```powershell
+setx AZURE_OPENAI_ENDPOINT "https://<your-resource>.openai.azure.com/"
+setx AZURE_OPENAI_API_KEY "<key>"
+setx AZURE_OPENAI_DEPLOYMENT "<deployment name>"
+```
+
+Any URL Microsoft Foundry shows for the resource works as the endpoint: the Azure OpenAI endpoint, the project endpoint, or a deployment's Target URI (which also gives the deployment name, so `AZURE_OPENAI_DEPLOYMENT` can be left out).
+
+Without them, quest lines use the default voices (`DefaultMaleVoice` and `DefaultFemaleVoice` in `appsettings.json`) and no style. Restart the API, and Visual Studio if you run it from there, after setting them.
+
 ## Quest data
 
 Quests live in a SQLite database, `data/wowtts.db` (git-ignored). Fill it with the importer, run from the repo folder:

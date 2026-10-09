@@ -7,6 +7,8 @@ public sealed class WowTtsDbContext(DbContextOptions<WowTtsDbContext> options) :
     public DbSet<QuestEntity> Quests => Set<QuestEntity>();
     public DbSet<MapZoneEntity> MapZones => Set<MapZoneEntity>();
     public DbSet<QuestCategoryEntity> QuestCategories => Set<QuestCategoryEntity>();
+    public DbSet<NpcVoiceEntity> NpcVoices => Set<NpcVoiceEntity>();
+    public DbSet<AudioPerformanceEntity> AudioPerformances => Set<AudioPerformanceEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,6 +38,21 @@ public sealed class WowTtsDbContext(DbContextOptions<WowTtsDbContext> options) :
             category.ToTable("QuestCategories");
             category.HasKey(c => c.Id);
             category.Property(c => c.Id).ValueGeneratedNever();
+        });
+
+        modelBuilder.Entity<NpcVoiceEntity>(voice =>
+        {
+            voice.ToTable("NpcVoices");
+            voice.HasKey(v => v.Id);
+            voice.HasIndex(v => new { v.NpcName, v.NpcGender }).IsUnique();
+        });
+
+        modelBuilder.Entity<AudioPerformanceEntity>(performance =>
+        {
+            performance.ToTable("AudioPerformances");
+            performance.HasKey(p => new { p.QuestId, p.Part });
+            performance.Property(p => p.Part).HasConversion<string>().HasMaxLength(20);
+            performance.Property(p => p.DirectedBy).HasConversion<string>().HasMaxLength(20);
         });
     }
 }

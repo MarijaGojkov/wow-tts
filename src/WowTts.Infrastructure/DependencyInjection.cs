@@ -7,6 +7,7 @@ using WowTts.Application.Abstractions;
 using WowTts.Infrastructure.Persistence;
 using WowTts.Infrastructure.Speech;
 using WowTts.Infrastructure.Storage;
+using WowTts.Infrastructure.Voices;
 
 namespace WowTts.Infrastructure;
 
@@ -30,6 +31,25 @@ public static class DependencyInjection
             .ValidateOnStart();
 
         services.AddSingleton<ISpeechSynthesizer, AzureSpeechSynthesizer>();
+        services.AddSingleton<IVoiceCatalog, AzureVoiceCatalog>();
+
+        // The voice director: a GPT model on Azure OpenAI when AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY and
+        // AZURE_OPENAI_DEPLOYMENT are set, otherwise the default voices.
+        services.AddOptions<VoiceDirectorOptions>()
+            .Bind(configuration.GetSection(VoiceDirectorOptions.SectionName))
+            .Configure(options =>
+        {
+            options.Endpoint = configuration["AZURE_OPENAI_ENDPOINT"] ?? "";
+            options.ApiKey = configuration["AZURE_OPENAI_API_KEY"] ?? "";
+            options.Deployment = configuration["AZURE_OPENAI_DEPLOYMENT"] ?? "";
+        });
+        services.AddSingleton<DefaultVoiceDirector>();
+        services.AddSingleton<IVoiceDirector>(provider =>
+            provider.GetRequiredService<IOptions<VoiceDirectorOptions>>().Value.IsConfigured
+                ? ActivatorUtilities.CreateInstance<AzureOpenAiVoiceDirector>(provider)
+                : provider.GetRequiredService<DefaultVoiceDirector>());
+        services.AddScoped<INpcVoiceRepository, SqliteNpcVoiceRepository>();
+        services.AddScoped<IPerformanceRepository, SqlitePerformanceRepository>();
 
         // Quests live in a SQLite file. Its path in appsettings.json is relative to the app's project folder.
         services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));

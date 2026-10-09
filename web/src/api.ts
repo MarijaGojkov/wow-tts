@@ -19,8 +19,28 @@ export interface QuestPartStatus {
   hasAudio: boolean
 }
 
+// How a line was spoken: chosen by the AI voice director, or the default when no AI is set up.
+export interface VoicePerformance {
+  voice: string
+  style: string | null
+  styleDegree: number
+  ratePercent: number
+  pitchPercent: number
+  reason: string
+  directedBy: 'ai' | 'default'
+}
+
+// The voice cast for an NPC, used for all their quests.
+export interface NpcVoice {
+  npcName: string
+  npcGender: string
+  voice: string
+  reason: string
+}
+
 export interface QuestPartInfo extends QuestPartStatus {
   text: string
+  performance: VoicePerformance | null
 }
 
 // Fields shared by the list and the detail view.
@@ -48,6 +68,7 @@ export interface QuestSummary extends QuestBase {
 export interface Quest extends QuestBase {
   npcRace: string
   npcGender: string
+  voice: NpcVoice | null
   parts: QuestPartInfo[]
 }
 
@@ -170,4 +191,24 @@ export function audioUrl(questId: number, part: QuestPart): string {
 // Asks the API for the audio, which makes it generate and save the MP3 if it doesn't exist yet.
 export async function generateAudio(questId: number, part: QuestPart): Promise<void> {
   await (await request(audioUrl(questId, part))).blob()
+}
+
+async function send(url: string, method: string): Promise<void> {
+  let response: Response
+  try {
+    response = await fetch(url, { method })
+  } catch {
+    throw new Error(unreachable)
+  }
+  if (!response.ok) throw await toError(response)
+}
+
+// Deletes a part's audio, so it can be generated again with a fresh performance.
+export function deleteAudio(questId: number, part: QuestPart): Promise<void> {
+  return send(audioUrl(questId, part), 'DELETE')
+}
+
+// Forgets the NPC's voice, so the voice director casts a new one for the next audio.
+export function recastVoice(questId: number): Promise<void> {
+  return send(`/api/quests/${questId}/voice`, 'DELETE')
 }

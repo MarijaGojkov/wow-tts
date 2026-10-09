@@ -21,9 +21,11 @@ public static class DatabaseSetup
         // the newer tables or columns are missing, so say how to fix it instead of failing later.
         try
         {
-            await db.Quests.Select(q => new { q.GiverX, q.CategoryId, q.Side }).Take(1).ToListAsync();
+            await db.Quests.OrderBy(q => q.Id).Select(q => new { q.GiverX, q.CategoryId, q.Side }).Take(1).ToListAsync();
             await db.MapZones.AnyAsync();
             await db.QuestCategories.AnyAsync();
+            await db.NpcVoices.AnyAsync();
+            await db.AudioPerformances.AnyAsync();
         }
         catch (SqliteException ex)
         {

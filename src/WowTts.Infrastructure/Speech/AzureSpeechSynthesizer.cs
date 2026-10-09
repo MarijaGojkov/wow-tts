@@ -2,6 +2,7 @@ using Microsoft.CognitiveServices.Speech;
 using Microsoft.Extensions.Options;
 using WowTts.Application.Abstractions;
 using WowTts.Application.Exceptions;
+using WowTts.Domain.Speech;
 
 namespace WowTts.Infrastructure.Speech;
 
@@ -11,15 +12,22 @@ public sealed class AzureSpeechSynthesizer(IOptions<SpeechOptions> options) : IS
 {
     private readonly SpeechOptions _options = options.Value;
 
-    public async Task<byte[]> SynthesizeAsync(string text, string? voice)
+    public Task<byte[]> SynthesizeAsync(string text, string? voice) =>
+        SpeakAsync(voice ?? _options.DefaultVoice, synthesizer => synthesizer.SpeakTextAsync(text));
+
+    // Spoken through SSML, so the style, speed and pitch apply.
+    public Task<byte[]> PerformAsync(string text, VoicePerformance performance) =>
+        SpeakAsync(performance.Voice, synthesizer => synthesizer.SpeakSsmlAsync(SsmlBuilder.Build(text, performance)));
+
+    private async Task<byte[]> SpeakAsync(string voice, Func<SpeechSynthesizer, Task<SpeechSynthesisResult>> speak)
     {
         var config = SpeechConfig.FromSubscription(_options.Key, _options.Region);
-        config.SpeechSynthesisVoiceName = voice ?? _options.DefaultVoice;
+        config.SpeechSynthesisVoiceName = voice;
         config.SetSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3);
 
         // No audio config: the audio stays in memory (result.AudioData) instead of going to the speakers.
         using var synthesizer = new SpeechSynthesizer(config, audioConfig: null);
-        using var result = await synthesizer.SpeakTextAsync(text);
+        using var result = await speak(synthesizer);
 
         if (result.Reason == ResultReason.SynthesizingAudioCompleted)
             return result.AudioData;

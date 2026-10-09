@@ -54,4 +54,24 @@ public sealed class QuestsController(QuestService questService) : ControllerBase
 
         return File(audio, "audio/mpeg");
     }
+
+    // Deletes a quest part's audio, so the next request generates it again with a fresh performance.
+    [HttpDelete("{id:int}/audio/{part}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<IActionResult> DeleteAudio(int id, QuestPart part)
+    {
+        await questService.DeleteAudioAsync(id, part);
+        return NoContent();
+    }
+
+    // Forgets the voice cast for this quest's NPC, so the voice director casts a new one next time.
+    [HttpDelete("{id:int}/voice")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<IActionResult> Recast(int id)
+    {
+        await questService.RecastAsync(id);
+        return NoContent();
+    }
 }

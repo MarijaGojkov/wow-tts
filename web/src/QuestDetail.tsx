@@ -1,6 +1,14 @@
 import { useState } from 'react'
-import { audioUrl, generateAudio, type Quest, type QuestPartInfo } from './api'
-import { audioCount, errorText, partLabels, sideLabels, sourceLabels, splitWords } from './labels'
+import {
+  audioUrl,
+  deleteAudio,
+  generateAudio,
+  recastVoice,
+  type Quest,
+  type QuestPartInfo,
+  type VoicePerformance,
+} from './api'
+import { audioCount, errorText, partLabels, sideLabels, sourceLabels, splitWords, voiceLabel } from './labels'
 
 interface QuestDetailProps {
   quest: Quest
@@ -8,6 +16,22 @@ interface QuestDetailProps {
 }
 
 export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
+  const [recasting, setRecasting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function recast() {
+    setRecasting(true)
+    setError(null)
+    try {
+      await recastVoice(quest.id)
+      await onChanged()
+    } catch (e) {
+      setError(errorText(e, 'Recasting the voice failed.'))
+    } finally {
+      setRecasting(false)
+    }
+  }
+
   return (
     <article className="detail">
       <header className="detail-head">
@@ -31,6 +55,19 @@ export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
             {[quest.npcGender, quest.npcRace].filter((value) => value !== 'Unknown').map(splitWords).join(' ') ||
               'Gender unknown'}
           </p>
+        </div>
+        <div className="npc-voice">
+          <p className="label">Voice</p>
+          {quest.voice ? (
+            <>
+              <p title={quest.voice.reason}>{voiceLabel(quest.voice.voice)}</p>
+              <button type="button" className="link-button" onClick={recast} disabled={recasting}>
+                {recasting ? 'Recasting…' : 'Recast'}
+              </button>
+            </>
+          ) : (
+            <p className="sub">Cast on first audio</p>
+          )}
         </div>
         <div>
           <p className="label">Where</p>
@@ -66,9 +103,12 @@ export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
         </div>
       </section>
 
+      {quest.voice && <p className="voice-reason">“{quest.voice.reason}”</p>}
+      {error && <p className="error">{error}</p>}
+
       <div className="parts">
         {quest.parts.map((part) => (
-          <PartCard key={`${quest.id}-${part.part}`} questId={quest.id} part={part} onGenerated={onChanged} />
+          <PartCard key={`${quest.id}-${part.part}`} questId={quest.id} part={part} onChanged={onChanged} />
         ))}
       </div>
     </article>
@@ -78,26 +118,32 @@ export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
 interface PartCardProps {
   questId: number
   part: QuestPartInfo
-  onGenerated: () => Promise<void>
+  onChanged: () => Promise<void>
 }
 
-function PartCard({ questId, part, onGenerated }: PartCardProps) {
-  const [busy, setBusy] = useState(false)
+function PartCard({ questId, part, onChanged }: PartCardProps) {
+  const [busy, setBusy] = useState<'generating' | 'regenerating' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Changes after regenerating, so the browser fetches the new MP3 instead of playing the old one from its cache.
+  const [version, setVersion] = useState(0)
   const label = partLabels[part.part]
 
-  async function generate() {
-    setBusy(true)
+  async function generate(regenerate: boolean) {
+    setBusy(regenerate ? 'regenerating' : 'generating')
     setError(null)
     try {
+      if (regenerate) await deleteAudio(questId, part.part)
       await generateAudio(questId, part.part)
-      await onGenerated()
+      setVersion(Date.now())
+      await onChanged()
     } catch (e) {
       setError(errorText(e, 'Generating the audio failed.'))
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
+
+  const src = audioUrl(questId, part.part) + (version ? `?v=${version}` : '')
 
   return (
     <section className="part">
@@ -113,12 +159,19 @@ function PartCard({ questId, part, onGenerated }: PartCardProps) {
 
       <p className="part-text">{part.text}</p>
 
+      {part.hasAudio && <PerformanceLine performance={part.performance} />}
+
       <footer className="part-foot">
         {part.hasAudio ? (
-          <audio controls preload="none" src={audioUrl(questId, part.part)} />
+          <>
+            <audio controls preload="none" src={src} />
+            <button type="button" className="regenerate" onClick={() => generate(true)} disabled={busy !== null}>
+              {busy === 'regenerating' ? 'Directing and generating…' : 'Regenerate'}
+            </button>
+          </>
         ) : (
-          <button type="button" className="generate" onClick={generate} disabled={busy}>
-            {busy ? 'Generating…' : 'Generate audio'}
+          <button type="button" className="generate" onClick={() => generate(false)} disabled={busy !== null}>
+            {busy === 'generating' ? 'Directing and generating…' : 'Generate audio'}
           </button>
         )}
         <span
@@ -131,5 +184,31 @@ function PartCard({ questId, part, onGenerated }: PartCardProps) {
 
       {error && <p className="error">{error}</p>}
     </section>
+  )
+}
+
+// "Davis (US) · angry ×1.3 · slower 10% · lower 15%", and the director's reason underneath.
+function PerformanceLine({ performance }: { performance: VoicePerformance | null }) {
+  if (!performance) {
+    return <p className="performance muted">Made before the voice director, so how it was spoken wasn't recorded.</p>
+  }
+
+  const details = [
+    voiceLabel(performance.voice),
+    performance.style ? `${performance.style} ×${performance.styleDegree}` : 'no style',
+    performance.ratePercent !== 0 && `${performance.ratePercent < 0 ? 'slower' : 'faster'} ${Math.abs(performance.ratePercent)}%`,
+    performance.pitchPercent !== 0 && `${performance.pitchPercent < 0 ? 'lower' : 'higher'} ${Math.abs(performance.pitchPercent)}%`,
+  ].filter(Boolean)
+
+  return (
+    <div className="performance">
+      <p>
+        <span className={`director director-${performance.directedBy}`}>
+          {performance.directedBy === 'ai' ? 'AI' : 'Default'}
+        </span>
+        {details.join(' · ')}
+      </p>
+      <p className="performance-reason">{performance.reason}</p>
+    </div>
   )
 }

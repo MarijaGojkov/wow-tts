@@ -109,13 +109,13 @@ h1 span { color: var(--gold); }
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(11, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   position: relative;
 }
 .track::before {
   content: "";
   position: absolute;
-  left: 4.5%; right: 4.5%;
+  left: 4%; right: 4%;
   top: 17px;
   height: 2px;
   background: var(--line);
@@ -446,8 +446,9 @@ td strong { font-weight: 600; }
       <li class="done"><a href="#phase-6"><span class="node">6</span>Database</a></li>
       <li class="done"><a href="#phase-7"><span class="node">7</span>Zones</a></li>
       <li class="done"><a href="#phase-8"><span class="node">8</span>Map</a></li>
-      <li class="next"><a href="#phase-9"><span class="node">9</span>Addon</a></li>
-      <li><a href="#phase-10"><span class="node">10</span>Captures</a></li>
+      <li class="next"><a href="#phase-9"><span class="node">9</span>AI voices</a></li>
+      <li><a href="#phase-10"><span class="node">10</span>Addon</a></li>
+      <li><a href="#phase-11"><span class="node">11</span>Captures</a></li>
     </ol>
   </nav>
 
@@ -935,9 +936,39 @@ td strong { font-weight: 600; }
         </div>
       </article>
 
-      <article class="quest is-next" id="phase-9">
+      <article class="quest" id="phase-9">
         <header>
-          <h3><small>Phase 9</small>The addon</h3>
+          <h3><small>Phase 9</small>AI voice director</h3>
+          <span class="pill done">Done</span>
+        </header>
+        <p class="objective">Click <strong>Generate audio</strong> and an AI decides which voice fits the NPC and how the line is spoken.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li class="checked"><b class="l-domain">Domain</b><code>VoiceInfo</code>, <code>VoicePerformance</code> (style, strength 0.5–2, speed and pitch ±30%) and <code>NpcVoice</code>.</li>
+              <li class="checked"><b class="l-app">Application</b><code>VoiceCastingService</code>: the AI casts an NPC's voice once (saved), then picks style, strength, speed and pitch per line. Every answer is checked against the real voice list.</li>
+              <li class="checked"><b class="l-infra">Infrastructure</b><code>AzureOpenAiVoiceDirector</code> with a strict JSON schema; <code>DefaultVoiceDirector</code> when no AI is set up or it fails; <code>SsmlBuilder</code>; <code>NpcVoices</code> and <code>AudioPerformances</code> tables.</li>
+              <li class="checked"><b class="l-api">API and viewer</b>regenerate a part, recast an NPC, and see the voice, style, who chose it and why.</li>
+              <li class="checked"><b class="l-infra">Azure</b><code>gpt-5-mini</code> on the Foundry resource <code>wow-agents-marija2000</code>, called through Azure OpenAI's v1 API with the OpenAI SDK, reasoning effort low. About 3–7 seconds per line.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p>
+              <ul>
+                <li>✓ Kaltunk is cast as Tony, unfriendly ×1.2, 10% slower and lower: "gruff, approving and mildly mocking"</li>
+                <li>✓ His next part keeps Tony</li>
+              </ul>
+            </div>
+            <div><p class="label">Skills</p><div class="chips"><span class="chip">Azure OpenAI</span><span class="chip">Structured outputs</span><span class="chip">SSML styles</span><span class="chip">Prompt design</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Add AI voice director</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest is-next" id="phase-10">
+        <header>
+          <h3><small>Phase 10</small>The addon</h3>
           <span class="pill next">Next</span>
         </header>
         <p class="objective">Open a quest in game and hear it. Quests without audio are saved, so the API can add them.</p>
@@ -964,9 +995,9 @@ td strong { font-weight: 600; }
         </div>
       </article>
 
-      <article class="quest" id="phase-10">
+      <article class="quest" id="phase-11">
         <header>
-          <h3><small>Phase 10</small>Import captured Forever quests</h3>
+          <h3><small>Phase 11</small>Import captured Forever quests</h3>
           <span class="pill">Planned</span>
         </header>
         <p class="objective">Quests saved by the addon end up in the database with source Captured.</p>
@@ -1016,6 +1047,9 @@ td strong { font-weight: 600; }
           <tr><td>Text priority</td><td>Captured &gt; CMangos &gt; Sample. Changed text deletes the old MP3s</td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>Zone and map data</td><td>Classic Era client tables from wago.tools: <code>AreaTable</code>, <code>QuestSort</code>, <code>UiMap</code>, <code>UiMapAssignment</code></td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>Map style</td><td>Real WoW map images as background, built by the importer from the game's own map tiles (via wago.tools). No downloading from Wowhead</td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Voice director</td><td>Azure OpenAI picks voice and performance; standard neural voices with styles; same NPC keeps the same voice</td><td class="nowrap">9 Oct 2026</td></tr>
+          <tr><td>Voice director model</td><td><code>gpt-5-mini</code> on Foundry, through Azure OpenAI's v1 API with the OpenAI SDK, reasoning effort low</td><td class="nowrap">9 Oct 2026</td></tr>
+          <tr><td>Azure resources</td><td>Speech stays on the free F0 resource; the Foundry resource <code>wow-agents-marija2000</code> only hosts the GPT model for the voice director</td><td class="nowrap">9 Oct 2026</td></tr>
           <tr><td>Ready-made audio packs</td><td>Not used: no clear license, and voice-cloned from Blizzard audio. Audio is generated on demand</td><td class="nowrap">8 Oct 2026</td></tr>
         </tbody>
       </table>
@@ -1027,8 +1061,8 @@ td strong { font-weight: 600; }
         <tbody>
           <tr><td class="num">8</td><td>How the addon folder reaches the game</td><td>Directory junction from the repo, copy by hand</td><td>Junction. One copy, and new audio appears in the game folder at once</td><td class="when">Phase 8</td></tr>
           <tr><td class="num">9</td><td>NPC race for imported quests</td><td>Leave as Unknown, or read it from the game's client data</td><td>Unknown for now. Only needed for voices per race</td><td class="when">Later</td></tr>
-          <tr><td class="num">11</td><td>Where Forever is installed</td><td>No WoW install was found on this PC</td><td>Install it here, or tell me where it is. Needed for the addon</td><td class="when">Phase 9</td></tr>
-          <tr><td class="num">10</td><td>Who speaks the progress and complete text</td><td>The quest giver (now), or the NPC you hand it in to</td><td>Store both NPCs. E.g. 783 is given by Deputy Willem but handed in to Marshal McBride</td><td class="when">NPC voices</td></tr>
+          <tr><td class="num">11</td><td>Where Forever is installed</td><td>No WoW install was found on this PC</td><td>Install it here, or tell me where it is. Needed for the addon</td><td class="when">Phase 10</td></tr>
+          <tr><td class="num">10</td><td>Who speaks the progress and complete text</td><td>The quest giver (now), or the NPC you hand it in to</td><td>Store both NPCs. E.g. 783 is given by Deputy Willem but handed in to Marshal McBride. Testing Phase 9 hit it: Gornek's complete line got Kaltunk's voice</td><td class="when">NPC voices</td></tr>
         </tbody>
       </table>
     </div>
@@ -1050,6 +1084,7 @@ td strong { font-weight: 600; }
           <tr><td>New audio isn't found in game</td><td>WoW only sees files that existed at startup. Generate first, then start the game</td></tr>
           <tr><td>Forever changed 616 quests, so cMaNGOS text is outdated for them</td><td>The addon captures Forever's own text, and captured text wins</td></tr>
           <tr><td>wago.tools has no Forever data yet, so zones and maps are Classic Era's</td><td>Forever's 3 new zones come from the addon's captures. Re-import once Forever's tables appear</td></tr>
+          <tr><td>The free F0 Speech tier allows few requests per minute and a monthly character allowance</td><td>Fine quest by quest. Before generating thousands at once, upgrade to S0 or move Speech to Foundry</td></tr>
           <tr><td>Old audio no longer matches changed text</td><td>Imports delete the MP3s of every part whose text changed</td></tr>
           <tr><td>Fixes in cMaNGOS's <code>Updates</code> folder aren't in the full dump</td><td>Quest text rarely changes there. Re-download the newest dump now and then</td></tr>
           <tr><td>Quest text belongs to Blizzard</td><td>Personal, private project. The database and dump are git-ignored</td></tr>
@@ -1087,10 +1122,10 @@ td strong { font-weight: 600; }
 
   <section class="next-step" id="next">
     <p class="eyebrow">Next step</p>
-    <h2>Phase 9: The addon</h2>
+    <h2>Phase 10: The addon</h2>
     <ol>
-      <li>Decision 11: where Forever is installed, for the addon.</li>
-      <li>Build the addon that plays and captures quests in game.</li>
+      <li>Decision 11: where Forever is installed.</li>
+      <li>Decision 10: store the NPC you hand a quest in to, so progress and complete lines get their own voice.</li>
     </ol>
   </section>
 

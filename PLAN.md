@@ -1,7 +1,7 @@
 # wow-tts implementation plan
 
 **Updated:** 8 October 2026
-**Status:** Phases 0–8 are done. Next up is Phase 9, the addon.
+**Status:** Phases 0–9 are done. Next is Phase 10, the addon.
 **Scope for starters:** speech, quests, a quest viewer and a small addon. No tests, batch jobs or voices endpoint yet.
 **Game:** World of Warcraft: Forever (launches 4 November 2026). About 5,200 quests: roughly 3,600 unchanged vanilla quests, 616 changed and 1,001 new.
 
@@ -323,7 +323,30 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 
 **Commit:** `Add interactive world map`
 
-### Phase 9: The addon
+### Phase 9: AI voice director ✅
+
+**Goal:** when you click **Generate audio**, an AI decides which voice fits the NPC and how the line is spoken.
+
+- **How it decides:**
+  - The first time an NPC speaks, a GPT model on **Azure OpenAI** casts their voice from the English neural voices of their gender (126 in total, 21 with styles), using their race, name and words. The choice is saved, so the NPC keeps that voice for all their quests
+  - For every line it picks a **style** the voice supports (angry, cheerful, sad, whispering, shouting, hopeful…), its **strength** (0.5–2), **speed** and **pitch** (±30%), and a one-sentence **reason**
+  - The answer must match a strict JSON schema. It's checked against the real voice list: an unknown voice or a style the voice doesn't have is replaced, and numbers are kept within limits
+- **Domain:** `VoiceInfo`, `VoicePerformance` (with its limits) and `NpcVoice`
+- **Application:** `IVoiceDirector`, `IVoiceCatalog`, `INpcVoiceRepository`, `IPerformanceRepository` and `VoiceCastingService`. `QuestService` generates audio through it, and can regenerate a part and recast an NPC
+- **Infrastructure:**
+  - `AzureOpenAiVoiceDirector` (OpenAI SDK 2.8.0 on Azure OpenAI's v1 API, structured output), used when `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_DEPLOYMENT` are set. Any endpoint Foundry shows works. Reasoning effort is `low` (`VoiceDirector:ReasoningEffort` in `appsettings.json`)
+  - `DefaultVoiceDirector`: the default voice per gender (Guy, Jenny), read plainly. Used without an AI, or when the AI call fails. Default voices aren't saved as castings, so the AI can still cast those NPCs later
+  - `AzureVoiceCatalog`, `SsmlBuilder` (`mstts:express-as`, `prosody`, pauses between paragraphs), and the `NpcVoices` and `AudioPerformances` tables
+- **API:** `DELETE /api/quests/{id}/audio/{part}` (regenerate) and `DELETE /api/quests/{id}/voice` (recast)
+- **Viewer:** each part shows its voice, style, speed, pitch, whether AI or the default chose it, and the reason. **Regenerate** per part, **Recast** for the NPC
+- **Checked:** Azure accepts the SSML (Davis, angry ×1.5, 10% slower, 15% lower, with `&` and `<` escaped). Without an AI, generating falls back to the default voice
+- [x] **Connected:** `gpt-5-mini` on the Foundry resource `wow-agents-marija2000`. Kaltunk (quest 4641) was cast as Tony, unfriendly ×1.2, 10% slower and lower: "gruff, approving and mildly mocking". His next part kept Tony. About 3–7 seconds per line
+- The test showed decision 10: the complete line is Gornek's, but got Kaltunk's voice
+
+**Done when:** with Azure OpenAI connected, generating a quest part shows "AI" with a fitting voice, style and reason, and the same NPC keeps their voice on their next quest.
+**Skills:** Azure OpenAI in Microsoft Foundry, structured outputs (JSON schema), SSML styles and prosody, prompt design.
+**Commit:** `Add AI voice director`
+### Phase 10: The addon
 
 **Goal:** open a quest in game and hear it. Quests without audio are saved, so the API can add them.
 
@@ -341,7 +364,7 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 **Skills:** WoW addon structure (`.toc`), Lua events, `PlaySoundFile` and `StopSound`, SavedVariables.
 **Commit:** `Add WoW addon that plays and captures quests`
 
-### Phase 10: Import captured Forever quests
+### Phase 11: Import captured Forever quests
 
 **Goal:** quests saved by the addon end up in the database with source Captured.
 
@@ -376,16 +399,18 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 | Text priority | Captured > CMangos > Sample. Changed text deletes the old MP3s | 8 Oct 2026 |
 | Zone and map data | Classic Era client tables from wago.tools: `AreaTable`, `QuestSort`, `UiMap`, `UiMapAssignment` | 8 Oct 2026 |
 | Map style | Real WoW map images as the background, built by the importer from the game's own map tiles (via wago.tools). Zones and quest givers drawn on top. No downloading from Wowhead | 9 Oct 2026 |
+| Voice director model | `gpt-5-mini` on Foundry, through Azure OpenAI's v1 API with the OpenAI SDK, reasoning effort low | 9 Oct 2026 |
+| Azure resources | Speech stays on the free F0 resource `wow-speech-marija2000`. The Foundry resource `wow-agents-marija2000` (East US) only hosts the GPT model for the voice director. Moving Speech to Foundry later is just a change of `SPEECH_KEY` and `SPEECH_REGION` | 9 Oct 2026 |
 | Ready-made audio packs | Not used. AI VoiceOver's packs have no clear license and are voice-cloned from Blizzard audio. Audio is generated on demand instead | 8 Oct 2026 |
 
 ### Open
 
 | # | Decision | Options | Suggestion | Needed by |
 |---|---|---|---|---|
-| 8 | How the addon folder reaches the game | Directory junction from the repo, copy by hand | Junction. One copy, and new audio appears in the game folder at once | Phase 9 |
-| 11 | Where Forever is installed | No WoW install was found on this PC | Install it here, or tell me where it is. Needed for the addon | Phase 9 |
+| 8 | How the addon folder reaches the game | Directory junction from the repo, copy by hand | Junction. One copy, and new audio appears in the game folder at once | Phase 10 |
+| 11 | Where Forever is installed | No WoW install was found on this PC | Install it here, or tell me where it is. Needed for the addon | Phase 10 |
 | 9 | NPC race for imported quests | Leave as Unknown, or read it from the game's client data (CreatureDisplayInfoExtra) | Unknown for now. Only needed for voices per race | Later |
-| 10 | Who speaks the progress and complete text | The quest giver (now), or the NPC you hand the quest in to (`creature_involvedrelation`) | Store both NPCs, so voices match who's talking. E.g. 783 is given by Deputy Willem but handed in to Marshal McBride | With NPC voices |
+| 10 | Who speaks the progress and complete text | The quest giver (now), or the NPC you hand the quest in to (`creature_involvedrelation`) | Store both NPCs, so voices match who's talking. E.g. 783 is given by Deputy Willem but handed in to Marshal McBride. Testing Phase 9 hit it: Gornek's complete line got Kaltunk's voice | Soon |
 
 ## Risks
 
@@ -397,6 +422,7 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 | The addon expects to call the API | It can't: WoW Lua has no network access. The API writes files, the addon only plays them |
 | New audio isn't found in game | WoW only sees files that existed at startup. Generate first, then start the game |
 | Forever changed 616 quests, so cMaNGOS text is outdated for them | The addon captures Forever's own text, and captured text wins over cMaNGOS |
+| The free F0 Speech tier allows only a few requests per minute and a monthly character allowance | Fine while generating quest by quest. Before generating thousands at once, upgrade Speech to S0 or move it to the Foundry resource |
 | A continent's map rectangle doesn't match its art (happened with Eastern Kingdoms) | Measure by fitting quest givers onto the land in the art, and correct it in `GameDataReader` |
 | wago.tools has no Forever data yet, so zones and maps are Classic Era's | Forever's 3 new zones come from the addon's captures. Re-import the tables once Forever's appear |
 | Old audio no longer matches changed text | Imports delete the MP3s of every part whose text changed |
@@ -423,8 +449,8 @@ Once speech and quests work, these are the natural next steps:
 
 ## Next step
 
-1. Decision 11: where Forever is installed, for the addon.
-2. Phase 9: the addon.
+1. Decision 11: where Forever is installed, for the addon (Phase 10).
+2. Decision 10: store the NPC you hand a quest in to, so progress and complete lines get their own voice.
 
 ## Notes
 

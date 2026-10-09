@@ -878,6 +878,83 @@ audio {
   cursor: progress;
 }
 
+.performance {
+  display: grid;
+  gap: 2px;
+  font-size: 0.86rem;
+}
+
+.performance p:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.performance.muted,
+.performance-reason {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.performance-reason {
+  font-style: italic;
+}
+
+.director {
+  font-family: var(--f-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.director-ai {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.director-default {
+  background: var(--panel-2);
+  color: var(--muted);
+}
+
+.regenerate,
+.link-button {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.regenerate:hover,
+.link-button:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+
+.regenerate:disabled,
+.link-button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.npc-voice .link-button {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+}
+
+.voice-reason {
+  margin-top: -12px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-style: italic;
+}
+
 .chars {
   font-family: var(--f-mono);
   font-size: 0.78rem;

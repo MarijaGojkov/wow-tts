@@ -37,6 +37,12 @@ export function errorText(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
 }
 
+// "en-US-DavisNeural" -> "Davis (US)", "en-GB-RyanNeural" -> "Ryan (GB)"
+export function voiceLabel(voice: string): string {
+  const [, region, name] = voice.split('-')
+  return name ? `${name.replace(/(Multilingual)?Neural$/, '')} (${region})` : voice
+}
+
 // "NightElf" -> "Night Elf"
 export function splitWords(value: string): string {
   return value.replace(/([a-z])([A-Z])/g, '$1 $2')

@@ -3,6 +3,7 @@ using WowTts.Application.Import;
 using WowTts.Application.Maps;
 using WowTts.Application.Quests;
 using WowTts.Application.Speech;
+using WowTts.Application.Voices;
 
 namespace WowTts.Application;
 
@@ -16,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<QuestImportService>();
         services.AddScoped<GameDataImportService>();
         services.AddScoped<MapService>();
+        services.AddScoped<VoiceCastingService>();
 
         return services;
     }

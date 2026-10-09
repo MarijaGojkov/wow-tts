@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using WowTts.Application.Abstractions;
 using WowTts.Application.Exceptions;
+using WowTts.Application.Voices;
 using WowTts.Domain.Maps;
 using WowTts.Domain.Quests;
 using WowTts.Domain.Speech;
@@ -12,6 +13,9 @@ public sealed class QuestService(
     IGameDataRepository gameData,
     IAudioStore audioStore,
     ISpeechSynthesizer synthesizer,
+    VoiceCastingService voiceCasting,
+    IPerformanceRepository performances,
+    INpcVoiceRepository npcVoices,
     ILogger<QuestService> logger)
 {
     public const int MaxPageSize = 500;
@@ -77,13 +81,19 @@ public sealed class QuestService(
         Lookup lookup = await LoadLookupAsync();
         Quest quest = await GetQuestAsync(id);
         MapZone? zone = lookup.ZoneOf(quest);
+        var performed = await performances.GetForQuestAsync(id);
 
         var parts = Enum.GetValues<QuestPart>()
             .Where(quest.HasText)
-            .Select(part => new QuestPartDto(
-                part,
-                TextCleaner.Clean(quest.GetText(part)!),
-                lookup.SavedAudio.Contains(new AudioKey(quest.Id, part))))
+            .Select(part =>
+            {
+                bool hasAudio = lookup.SavedAudio.Contains(new AudioKey(quest.Id, part));
+                return new QuestPartDto(
+                    part,
+                    TextCleaner.Clean(quest.GetText(part)!),
+                    hasAudio,
+                    hasAudio ? performed.GetValueOrDefault(part) : null);
+            })
             .ToList();
 
         return new QuestDto(
@@ -91,6 +101,7 @@ public sealed class QuestService(
             quest.Level, quest.MinLevel, quest.Side,
             quest.CategoryId, lookup.CategoryName(quest.CategoryId),
             zone?.Id, zone?.Name, MapPosition(quest, zone),
+            await npcVoices.GetAsync(quest.NpcName, quest.NpcGender),
             parts);
     }
 
@@ -154,10 +165,33 @@ public sealed class QuestService(
         logger.LogInformation("Quest {QuestId} {Part}: generating audio for {Characters} characters",
             id, part, spoken.Length);
 
-        byte[] audio = await synthesizer.SynthesizeAsync(spoken, voice: null);
+        // The voice director picks the voice and how the line is spoken.
+        VoicePerformance performance = await voiceCasting.DecideAsync(quest, part, spoken);
+        byte[] audio = await synthesizer.PerformAsync(spoken, performance);
+
         await audioStore.SaveAsync(id, part, audio);
+        await performances.SaveAsync(id, part, performance);
 
         return audio;
+    }
+
+    // Removes a quest part's audio, so the next request generates it again with a fresh performance.
+    public async Task DeleteAudioAsync(int id, QuestPart part)
+    {
+        if (!Enum.IsDefined(part))
+            throw new InvalidRequestException($"Unknown quest part '{part}'. Use accept, progress or complete.");
+
+        await GetQuestAsync(id);
+        audioStore.Delete(id, part);
+        await performances.DeleteAsync(id, part);
+    }
+
+    // Forgets the voice cast for this quest's NPC, so the director casts a new one next time.
+    // Audio that already exists keeps its old voice until it's regenerated.
+    public async Task RecastAsync(int id)
+    {
+        Quest quest = await GetQuestAsync(id);
+        await npcVoices.DeleteAsync(quest.NpcName, quest.NpcGender);
     }
 
     private async Task<Quest> GetQuestAsync(int id)

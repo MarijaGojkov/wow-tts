@@ -1,5 +1,6 @@
 using WowTts.Domain.Maps;
 using WowTts.Domain.Quests;
+using WowTts.Domain.Speech;
 
 namespace WowTts.Application.Quests;
 
@@ -19,11 +20,13 @@ public sealed record QuestDto(
     int? MapZoneId,
     string? MapZoneName,
     MapPoint? MapPosition,
+    NpcVoice? Voice,
     IReadOnlyList<QuestPartDto> Parts);
 
 // One part of a quest. Text is what will be spoken, with placeholders already replaced.
-// HasAudio tells whether the MP3 has been generated yet.
-public sealed record QuestPartDto(QuestPart Part, string Text, bool HasAudio);
+// HasAudio tells whether the MP3 has been generated yet, and Performance how it was spoken
+// (null for audio made before the voice director existed).
+public sealed record QuestPartDto(QuestPart Part, string Text, bool HasAudio, VoicePerformance? Performance);
 
 // A short quest for lists and the map, without the text.
 public sealed record QuestSummaryDto(
