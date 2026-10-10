@@ -52,6 +52,63 @@ Without them, quest lines use the default voices (`DefaultMaleVoice` and `Defaul
 
 An NPC keeps the same person when you switch, e.g. `en-US-TonyNeural` becomes `en-US-Tony:DragonHDOmniLatestNeural`. Existing MP3s stay as they are until you regenerate them. Restart the API after changing it.
 
+## Setting up on a new PC
+
+Step by step, so it can be followed by hand or by a coding agent. Commands run from the repo folder in PowerShell. Never paste keys into a chat; set them with `setx` yourself.
+
+### 1. Tools
+
+```powershell
+winget install Microsoft.DotNet.SDK.9
+winget install OpenJS.NodeJS.LTS
+npm install --prefix web
+```
+
+Check: `dotnet --version` shows 9.x, `node --version` shows a version.
+
+### 2. Keys (environment variables)
+
+From the Azure portal:
+
+- Speech resource `wow-speech-marija2000` → **Keys and Endpoint**: Key 1 and the region (`eastus`)
+- Foundry resource `wow-agents-marija2000` → deployment `gpt-5-mini`: its key and endpoint
+
+```powershell
+setx SPEECH_KEY "<speech key>"
+setx SPEECH_REGION "eastus"
+setx AZURE_OPENAI_ENDPOINT "https://wow-agents-marija2000.services.ai.azure.com/openai/v1/responses"
+setx AZURE_OPENAI_API_KEY "<foundry key>"
+setx AZURE_OPENAI_DEPLOYMENT "gpt-5-mini"
+```
+
+Then open a **new** terminal (and restart Visual Studio or the Claude app), because programs only see variables that existed when they started.
+
+### 3. Data
+
+Everything below is git-ignored. Either:
+
+- **From the old PC:** extract `wow-tts-data.zip` into the repo folder, so its `data/`, `addon/` and `web/` folders merge with the repo's. It holds the database (quests, NPC voice castings, performances, word timings), the quest audio, the map images, the cMaNGOS dump, the game tables and the AI VoiceOver pack. Nothing to import then.
+- **Or rebuild it:** download the cMaNGOS dump into `data/cmangos` and run the importer's `gamedata`, `cmangos`, `mapimages`, then download the AI VoiceOver pack into `data/voiceover` and run `voiceover` (see Quest data below). NPC voice castings and AI performances can't be rebuilt; the voice director makes new ones.
+
+Check: `dotnet run --project src/WowTts.Api`, then http://localhost:5219/api/quests/stats shows about 4,221 quests and 6,300 parts with audio.
+
+### 4. Whisper (only for making new word timings)
+
+Word timings already in the database work without it. Whisper is only needed to time audio that has none yet (`timings`).
+
+1. **Graphics card:** `nvidia-smi` lists an NVIDIA card and a driver of 580 or newer. Without an NVIDIA card, skip to step 3: Whisper then runs on the processor, which is many times slower.
+2. **CUDA Toolkit 13** (about 3 GB): `winget install Nvidia.CUDA`, or the installer from https://developer.nvidia.com/cuda-downloads (Windows, x86_64, exe local). Afterwards a **new** terminal must show `nvcc --version` with release 13.x.
+3. **The model** (1,624,555,275 bytes) into `data/models` (git-ignored):
+
+   ```powershell
+   New-Item -ItemType Directory -Force data/models
+   curl.exe -L -o data/models/ggml-large-v3-turbo.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+   (Get-Item data/models/ggml-large-v3-turbo.bin).Length   # 1624555275
+   ```
+
+4. **Test** on 20 lines: `dotnet run --project tools/WowTts.Importer -- timings --limit 20`. It prints `Whisper runs on: Cuda` with an NVIDIA card (`Cpu` without), and `Timed now: 20`, `Failed: 0`.
+5. **Then zone by zone:** `dotnet run --project tools/WowTts.Importer -- timings --zone "Darkshore"`. A zone takes a few minutes on the graphics card. Ctrl+C stops after the current line; running it again carries on. Lines that already have timings are skipped.
+
 ## Quest data
 
 Quests live in a SQLite database, `data/wowtts.db` (git-ignored). Fill it with the importer, run from the repo folder:
@@ -71,6 +128,9 @@ dotnet run --project tools/WowTts.Importer -- samples
 # ready-made quest audio from the AI VoiceOver addon's English vanilla sound pack (personal use, git-ignored):
 # extract AI_VoiceOverData_Vanilla into data/voiceover first. --replace overwrites audio you already have
 dotnet run --project tools/WowTts.Importer -- voiceover
+
+# word timings (karaoke) for audio that has none, with Whisper; one zone at a time. See "Whisper" below
+dotnet run --project tools/WowTts.Importer -- timings --zone Teldrassil
 ```
 
 If the API or importer says the database was created by an older version, delete `data/wowtts.db` and run `gamedata` and `cmangos` again.

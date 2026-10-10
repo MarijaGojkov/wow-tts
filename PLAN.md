@@ -427,6 +427,7 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 - [x] Downloaded `ggml-large-v3-turbo.bin` (1.6 GB) into `data/models`. Whisper runs on CUDA: about 30× faster than real time, 65% GPU load on average (81% peak), 3.2 GB video memory, up to 84 °C
 - [x] **Fixed:** Whisper stopped after its first 30-second window on longer lines (quest 929 lost its last 20 words). It now listens again from just before the last word it heard, until the end
 - [x] Test (20 lines) and **Teldrassil** (83 quests, 147 lines, 2 minutes): all timed, 98.3% average match, lowest 80%, none below 70%. In the viewer the highlight follows the imported voices
+- [x] Whisper falls back to the processor (`Whisper.net.Runtime`) on PCs without an NVIDIA card. The README has step-by-step setup for a new PC, including CUDA and the model
 - [ ] The other zones, one at a time: `timings --zone "<zone>"`, e.g. Darnassus, Darkshore, then the rest
 
 **Done when:** all imported lines have timings, a newly generated line gets Azure's, and the viewer's highlighting stays in step with the voice.
