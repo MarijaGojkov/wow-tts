@@ -14,7 +14,8 @@ public sealed record AudioImportResult(int Found, int Imported, int Replaced, in
 
 // Brings ready-made quest audio (e.g. from the AI VoiceOver addon) into the audio folder, with a performance that
 // says where it came from. Parts that already have audio keep it, unless replace is set.
-public sealed class AudioImportService(IQuestRepository quests, IAudioStore audioStore, IPerformanceRepository performances)
+public sealed class AudioImportService(
+    IQuestRepository quests, IAudioStore audioStore, IPerformanceRepository performances, ITimingsRepository timings)
 {
     public async Task<AudioImportResult> ImportAsync(
         IReadOnlyCollection<ImportedAudio> files, VoicePerformance performance, bool replace)
@@ -55,6 +56,8 @@ public sealed class AudioImportService(IQuestRepository quests, IAudioStore audi
         }
 
         await performances.SaveManyAsync(importedParts);
+        // Timings belonged to the audio that was there before.
+        await timings.DeleteManyAsync(importedParts.Select(item => item.Item1).ToList());
 
         return new AudioImportResult(files.Count, imported, replaced, keptExisting, unknownQuest, noText);
     }

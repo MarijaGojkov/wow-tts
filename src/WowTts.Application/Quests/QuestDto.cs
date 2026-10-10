@@ -29,9 +29,10 @@ public sealed record QuestDto(
 public sealed record QuestNpcDto(string Name, string Race, string Gender, NpcVoice? Voice);
 
 // One part of a quest. Text is what will be spoken, with placeholders already replaced, and Speaker who says it.
-// HasAudio tells whether the MP3 has been generated yet, and Performance how it was spoken
-// (null for audio made before the voice director existed).
-public sealed record QuestPartDto(QuestPart Part, string Text, string Speaker, bool HasAudio, VoicePerformance? Performance);
+// HasAudio tells whether the MP3 has been generated yet, Performance how it was spoken (null for audio made before
+// the voice director existed), and Timings when each word of Text is spoken (null until they're made).
+public sealed record QuestPartDto(
+    QuestPart Part, string Text, string Speaker, bool HasAudio, VoicePerformance? Performance, AudioTimings? Timings);
 
 // A short quest for lists and the map, without the text.
 public sealed record QuestSummaryDto(

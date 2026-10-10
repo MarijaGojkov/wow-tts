@@ -52,7 +52,8 @@ public sealed class QuestsController(QuestService questService) : ControllerBase
     {
         byte[] audio = await questService.GetOrCreateAudioAsync(id, part);
 
-        return File(audio, "audio/mpeg");
+        // Range requests let the browser jump to any point in the audio (the player's slider, karaoke words).
+        return File(audio, "audio/mpeg", enableRangeProcessing: true);
     }
 
     // Deletes a quest part's audio, so the next request generates it again with a fresh performance.

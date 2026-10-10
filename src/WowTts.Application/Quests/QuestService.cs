@@ -16,6 +16,7 @@ public sealed class QuestService(
     VoiceCastingService voiceCasting,
     IPerformanceRepository performances,
     INpcVoiceRepository npcVoices,
+    ITimingsRepository timings,
     ILogger<QuestService> logger)
 {
     public const int MaxPageSize = 500;
@@ -82,6 +83,7 @@ public sealed class QuestService(
         Quest quest = await GetQuestAsync(id);
         MapZone? zone = lookup.ZoneOf(quest);
         var performed = await performances.GetForQuestAsync(id);
+        var timed = await timings.GetForQuestAsync(id);
 
         var parts = Enum.GetValues<QuestPart>()
             .Where(quest.HasText)
@@ -93,7 +95,8 @@ public sealed class QuestService(
                     TextCleaner.Clean(quest.GetText(part)!),
                     quest.SpeakerOf(part).Name,
                     hasAudio,
-                    hasAudio ? performed.GetValueOrDefault(part) : null);
+                    hasAudio ? performed.GetValueOrDefault(part) : null,
+                    hasAudio ? timed.GetValueOrDefault(part) : null);
             })
             .ToList();
 
@@ -171,12 +174,19 @@ public sealed class QuestService(
 
         // The voice director picks the voice and how the line is spoken.
         VoicePerformance performance = await voiceCasting.DecideAsync(quest, part, spoken);
-        byte[] audio = await synthesizer.PerformAsync(spoken, performance);
+        SpokenAudio result = await synthesizer.PerformAsync(spoken, performance);
 
-        await audioStore.SaveAsync(id, part, audio);
+        await audioStore.SaveAsync(id, part, result.Audio);
         await performances.SaveAsync(id, part, performance);
 
-        return audio;
+        // Azure reports each word as it speaks it, so the karaoke timings come for free.
+        var (words, match) = WordAligner.Align(spoken, result.Words);
+        if (words.Count > 0)
+            await timings.SaveAsync(id, part, new AudioTimings(TimingSource.Azure, match, words));
+        else
+            await timings.DeleteAsync(id, part);
+
+        return result.Audio;
     }
 
     // Removes a quest part's audio, so the next request generates it again with a fresh performance.
@@ -188,6 +198,7 @@ public sealed class QuestService(
         await GetQuestAsync(id);
         audioStore.Delete(id, part);
         await performances.DeleteAsync(id, part);
+        await timings.DeleteAsync(id, part);
     }
 
     // Forgets the voice cast for one of this quest's NPCs, so the director casts a new one next time.

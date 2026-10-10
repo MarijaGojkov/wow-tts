@@ -1,7 +1,7 @@
 # wow-tts implementation plan
 
-**Updated:** 9 October 2026
-**Status:** Phases 0–9, 9.2 (NPC races, who hands in) and 9.3 (AI VoiceOver audio, 6,289 parts) are done. Dragon HD Omni voices (9.1) are being compared. Next is Phase 10, the addon.
+**Updated:** 10 October 2026
+**Status:** Phases 0–9, 9.2 (NPC races, who hands in) and 9.3 (AI VoiceOver audio, 6,289 parts) are done. Dragon HD Omni voices (9.1) are being compared. Next is Phase 9.4 (word timings and karaoke), then Phase 10, the addon.
 **Scope for starters:** speech, quests, a quest viewer and a small addon. No tests, batch jobs or voices endpoint yet.
 **Game:** World of Warcraft: Forever (launches 4 November 2026). About 5,200 quests: roughly 3,600 unchanged vanilla quests, 616 changed and 1,001 new.
 
@@ -391,6 +391,48 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 **Done when:** the pack is imported and vanilla quests play with race voices in the viewer.
 **Commit:** `Import AI VoiceOver audio`
 
+### Phase 9.4: Word timings and karaoke (zone by zone: Teldrassil done)
+
+**Goal:** every quest line knows when each word is spoken, so the words can light up karaoke-style while it plays: first in the viewer, then in game (Phase 10).
+
+**Where the timings come from:**
+
+| Audio | Source | Cost | Precision |
+|---|---|---|---|
+| Lines we generate (Azure Speech) | Azure's `WordBoundary` events while it speaks. Works for standard and Dragon HD Omni voices | Free | Exact |
+| The 6,289 imported AI VoiceOver lines (32 hours) | **Whisper large-v3-turbo on your RTX 2080 Super**, once | Free | ~0.1–0.3 s |
+
+**Before we start (you):**
+- Install NVIDIA's **CUDA Toolkit 13** (about 3 GB). Whisper.net's GPU runtime needs it; your driver (617) is new enough
+- The Whisper model `ggml-large-v3-turbo` (about 1.6 GB, from Hugging Face) is downloaded into `data/models/` (git-ignored). I'll ask before downloading
+
+**Steps:**
+1. **Domain:** `WordTiming` (word, start and end in milliseconds) and `AudioTimings` (the words of one part, their source `Azure`, `Whisper` or `Estimated`, and how well they matched the text)
+2. **Database:** an `AudioTimings` table, one row per quest part (words as JSON). Removed together with the audio: regenerate, delete, and imports that change the text or speaker
+3. **Our own lines:** `AzureSpeechSynthesizer` listens to `WordBoundary` and returns the word timings with the MP3. `QuestService` saves them with the performance
+4. **Imported lines:** importer command `timings [--force]`:
+   - Whisper.net 1.9 with its CUDA runtime, `large-v3-turbo`, English, token timestamps; the model loads once
+   - MP3 → 16 kHz mono WAV in memory (NAudio)
+   - Only parts with audio and no timings yet, so it can be stopped and resumed; prints progress
+   - About 45–90 minutes for everything. The graphics card is busy meanwhile
+5. **Matching to our text:** Whisper may mishear names ("Kaltunk" → "Coltunk"), so only its timings are used. Its words are aligned with our quest text (dynamic programming, like a diff). Matched words take Whisper's times; unmatched ones are spread between their neighbours by length. A match score is saved, and lines below ~70% are listed, since their audio probably says something else
+6. **API:** each part in `GET /api/quests/{id}` gets its `words` (text, start, end) and the timing source
+7. **Viewer:** while a part plays, its text highlights word by word, following the audio's position. Clicking a word jumps there. A small badge shows where the timings came from
+
+**Built and checked so far:**
+- [x] CUDA Toolkit 13.4 installed
+- [x] Domain `WordAligner`, the `AudioTimings` table (created in the existing database on startup), Azure `WordBoundary` timings, the `timings` importer command (Whisper.net 1.9.1 + CUDA runtime, NAudio, DTW timestamps with the large-v3-turbo heads), `timings` on each part in the API, and the viewer's karaoke text
+- [x] **Azure:** a test line in Thomas (HD) got all 23 words timed (100% match). In the viewer the highlight follows the voice ("Farming" 0.5 s, "thirsty" 1.1 s, "work" 1.7 s), and clicking a word plays from there. The test line was removed again
+- [x] Fixed on the way: the audio endpoint now answers range requests, so the player's slider and word clicks can jump
+- [x] Downloaded `ggml-large-v3-turbo.bin` (1.6 GB) into `data/models`. Whisper runs on CUDA: about 30× faster than real time, 65% GPU load on average (81% peak), 3.2 GB video memory, up to 84 °C
+- [x] **Fixed:** Whisper stopped after its first 30-second window on longer lines (quest 929 lost its last 20 words). It now listens again from just before the last word it heard, until the end
+- [x] Test (20 lines) and **Teldrassil** (83 quests, 147 lines, 2 minutes): all timed, 98.3% average match, lowest 80%, none below 70%. In the viewer the highlight follows the imported voices
+- [ ] The other zones, one at a time: `timings --zone "<zone>"`, e.g. Darnassus, Darkshore, then the rest
+
+**Done when:** all imported lines have timings, a newly generated line gets Azure's, and the viewer's highlighting stays in step with the voice.
+**Skills:** Whisper.net (whisper.cpp) on CUDA, word alignment, Azure `WordBoundary` events, audio decoding with NAudio, syncing React to audio.
+**Commit:** `Add word timings and karaoke preview`
+
 ### Phase 10: The addon
 
 **Goal:** open a quest in game and hear it. Quests without audio are saved, so the API can add them.
@@ -404,8 +446,9 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
   - stop the sound when the quest window closes (`QUEST_FINISHED`) or a new one starts
   - save each quest's ID, title, text, NPC name and gender, zone and map position in the addon's saved data, with your character's name turned back into `$N`
   - optional: read quests without audio aloud right away with WoW's built-in text-to-speech
+- **Karaoke subtitles** (needs Phase 9.4): the API writes all word timings into `addon/WowTts/WowTts_Timings.lua` (start times only, a few MB, loaded on demand). While a line plays, a subtitle bar shows the spoken text and highlights each word on time, counting from when `PlaySoundFile` started (WoW can't report a sound's position). New timings appear after a `/reload`
 
-**Done when:** you open a quest in game and hear it. Closing the window stops it. Quests you open are saved after a `/reload` or logout.
+**Done when:** you open a quest in game and hear it, with the words lighting up as they're spoken. Closing the window stops it. Quests you open are saved after a `/reload` or logout.
 **Skills:** WoW addon structure (`.toc`), Lua events, `PlaySoundFile` and `StopSound`, SavedVariables.
 **Commit:** `Add WoW addon that plays and captures quests`
 
@@ -441,6 +484,7 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 | Quest data source | cMaNGOS classic-db for vanilla quests, plus quests captured in game for Forever's new and changed ones | 8 Oct 2026 |
 | Quest storage | SQLite file `data/wowtts.db` through EF Core, git-ignored. Audio stays as MP3 files | 8 Oct 2026 |
 | Importer | Console tool `tools/WowTts.Importer` | 8 Oct 2026 |
+| Word timings | Azure `WordBoundary` for lines we generate; Whisper large-v3-turbo on your GPU, once, for the imported ones | 10 Oct 2026 |
 | Text priority | Captured > CMangos > Sample. Changed text deletes the old MP3s | 8 Oct 2026 |
 | Zone and map data | Classic Era client tables from wago.tools: `AreaTable`, `QuestSort`, `UiMap`, `UiMapAssignment` | 8 Oct 2026 |
 | Map style | Real WoW map images as the background, built by the importer from the game's own map tiles (via wago.tools). Zones and quest givers drawn on top. No downloading from Wowhead | 9 Oct 2026 |
@@ -457,12 +501,16 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 | # | Decision | Options | Suggestion | Needed by |
 |---|---|---|---|---|
 | 8 | How the addon folder reaches the game | Directory junction from the repo, copy by hand | Junction. One copy, and new audio appears in the game folder at once | Phase 10 |
+| 12 | Where the karaoke shows in game | A subtitle bar, or colouring the words in the quest window itself | Subtitle bar. It shows the text that's actually spoken, even where Forever changed the quest window's text | Phase 10 |
 | 11 | Where Forever is installed | No WoW install was found on this PC | Install it here, or tell me where it is. Needed for the addon | Phase 10 |
 
 ## Risks
 
 | Risk | How we handle it |
 |---|---|
+| The CUDA Toolkit won't install or Whisper won't use the GPU | Whisper.net falls back to the processor: `small.en` takes about 4–6 hours instead. Or the Vulkan runtime |
+| Some imported audio doesn't say exactly our text | Alignment uses only Whisper's timings and spreads unmatched words; low match scores are listed for a look |
+| Timings drift in game, because WoW can't tell how far a sound has played | Count from the moment `PlaySoundFile` starts; a line is ~18 seconds, so drift stays small |
 | Costs add up | Maximum text length on `/api/speech`, and quest audio is only generated once |
 | Anyone who can reach the API spends your Azure credit | Runs on localhost only. No hosting until authentication is added |
 | Placeholders get read aloud ("dollar N") | `TextCleaner` handles them in the Domain layer |
@@ -496,8 +544,9 @@ Once speech and quests work, these are the natural next steps:
 
 ## Next step
 
-1. Compare the standard and HD voices, and the imported AI VoiceOver ones, and pick (Phase 9.1).
-2. Decision 11: where Forever is installed, for the addon (Phase 10).
+1. Install the CUDA Toolkit 13, then build word timings and the karaoke preview (Phase 9.4).
+2. Compare the standard and HD voices, and the imported AI VoiceOver ones, and pick (Phase 9.1).
+3. Decision 11: where Forever is installed, for the addon (Phase 10).
 
 ## Notes
 

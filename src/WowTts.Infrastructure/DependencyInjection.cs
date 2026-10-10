@@ -53,6 +53,7 @@ public static class DependencyInjection
                 : provider.GetRequiredService<DefaultVoiceDirector>());
         services.AddScoped<INpcVoiceRepository, SqliteNpcVoiceRepository>();
         services.AddScoped<IPerformanceRepository, SqlitePerformanceRepository>();
+        services.AddScoped<ITimingsRepository, SqliteTimingsRepository>();
 
         // Quests live in a SQLite file. Its path in appsettings.json is relative to the app's project folder.
         services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));

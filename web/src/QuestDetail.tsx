@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   audioUrl,
   deleteAudio,
@@ -7,6 +7,7 @@ import {
   type Quest,
   type QuestNpc,
   type QuestNpcRole,
+  type AudioTimings,
   type QuestPartInfo,
   type VoicePerformance,
 } from './api'
@@ -192,6 +193,26 @@ function PartCard({ questId, part, showSpeaker, onChanged }: PartCardProps) {
   }
 
   const src = audioUrl(questId, part.part) + (version ? `?v=${version}` : '')
+  const audio = useRef<HTMLAudioElement>(null)
+  const playingMs = usePlaybackPosition(audio, part.hasAudio ? src : null)
+  const timings = part.hasAudio ? part.timings : null
+
+  // The audio isn't loaded until it first plays (preload="none"), and a jump before that is ignored,
+  // so wait for it to load first.
+  function playFrom(ms: number) {
+    const element = audio.current
+    if (!element) return
+    const jump = () => {
+      element.currentTime = ms / 1000
+      void element.play()
+    }
+    if (element.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      jump()
+    } else {
+      element.addEventListener('loadedmetadata', jump, { once: true })
+      element.load()
+    }
+  }
 
   return (
     <section className="part">
@@ -208,14 +229,18 @@ function PartCard({ questId, part, showSpeaker, onChanged }: PartCardProps) {
         </span>
       </header>
 
-      <p className="part-text">{part.text}</p>
+      {timings ? (
+        <KaraokeText text={part.text} timings={timings} playingMs={playingMs} onWordClick={playFrom} />
+      ) : (
+        <p className="part-text">{part.text}</p>
+      )}
 
       {part.hasAudio && <PerformanceLine performance={part.performance} />}
 
       <footer className="part-foot">
         {part.hasAudio ? (
           <>
-            <audio controls preload="none" src={src} />
+            <audio ref={audio} controls preload="none" src={src} />
             <button type="button" className="regenerate" onClick={() => generate(true)} disabled={busy !== null}>
               {busy === 'regenerating' ? 'Directing and generating…' : 'Regenerate'}
             </button>
@@ -225,6 +250,7 @@ function PartCard({ questId, part, showSpeaker, onChanged }: PartCardProps) {
             {busy === 'generating' ? 'Directing and generating…' : 'Generate audio'}
           </button>
         )}
+        {timings && <TimingBadge timings={timings} />}
         <span
           className="chars"
           title="Counted the way Azure bills text to speech: every letter, space, punctuation mark and line break"
@@ -235,6 +261,98 @@ function PartCard({ questId, part, showSpeaker, onChanged }: PartCardProps) {
 
       {error && <p className="error">{error}</p>}
     </section>
+  )
+}
+
+// Where the audio is, in milliseconds, while it plays (null when it isn't playing). Checked every frame,
+// because the audio element's own timeupdate event only fires a few times a second, too slow for karaoke.
+// timeupdate still helps where frames are paused, e.g. in a background tab.
+// src makes it attach again when the audio element appears or changes (after generating or regenerating).
+function usePlaybackPosition(audio: React.RefObject<HTMLAudioElement | null>, src: string | null): number | null {
+  const [position, setPosition] = useState<number | null>(null)
+
+  useEffect(() => {
+    const element = audio.current
+    if (!element) return
+    let frame = 0
+    const tick = () => {
+      setPosition(element.currentTime * 1000)
+      frame = requestAnimationFrame(tick)
+    }
+    const start = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(tick)
+    }
+    const stop = () => {
+      cancelAnimationFrame(frame)
+      setPosition(element.ended ? null : element.currentTime * 1000)
+    }
+    const update = () => setPosition(element.currentTime * 1000)
+    element.addEventListener('play', start)
+    element.addEventListener('pause', stop)
+    element.addEventListener('ended', stop)
+    element.addEventListener('seeked', update)
+    element.addEventListener('timeupdate', update)
+    return () => {
+      cancelAnimationFrame(frame)
+      element.removeEventListener('play', start)
+      element.removeEventListener('pause', stop)
+      element.removeEventListener('ended', stop)
+      element.removeEventListener('seeked', update)
+      element.removeEventListener('timeupdate', update)
+    }
+  }, [audio, src])
+
+  return position
+}
+
+// The part's text with each word as its own span: words already spoken are dimmed, the one being spoken is lit.
+// Clicking a word plays from there.
+function KaraokeText({
+  text,
+  timings,
+  playingMs,
+  onWordClick,
+}: {
+  text: string
+  timings: AudioTimings
+  playingMs: number | null
+  onWordClick: (ms: number) => void
+}) {
+  const pieces: React.ReactNode[] = []
+  let position = 0
+  timings.words.forEach((word, index) => {
+    if (word.offset > position) pieces.push(text.slice(position, word.offset))
+    const next = timings.words[index + 1]
+    const current = playingMs !== null && playingMs >= word.startMs && (!next || playingMs < next.startMs)
+    const spoken = playingMs !== null && !current && playingMs >= word.startMs
+    pieces.push(
+      <span
+        key={word.offset}
+        className={current ? 'word word-current' : spoken ? 'word word-spoken' : 'word'}
+        onClick={() => onWordClick(word.startMs)}
+      >
+        {text.slice(word.offset, word.offset + word.length)}
+      </span>,
+    )
+    position = word.offset + word.length
+  })
+  if (position < text.length) pieces.push(text.slice(position))
+
+  return <p className="part-text karaoke">{pieces}</p>
+}
+
+// "Karaoke · Whisper 96%": where the word timings came from, and how much of the text the source confirmed.
+function TimingBadge({ timings }: { timings: AudioTimings }) {
+  const source = timings.source === 'azure' ? 'Azure' : 'Whisper'
+  const title =
+    timings.source === 'azure'
+      ? 'Timings reported by Azure Speech while it spoke the line'
+      : 'Timings from Whisper listening to the audio, lined up with the text'
+  return (
+    <span className={timings.match < 0.7 ? 'timing-badge poor' : 'timing-badge'} title={title}>
+      Karaoke · {source} {Math.round(timings.match * 100)}%
+    </span>
   )
 }
 

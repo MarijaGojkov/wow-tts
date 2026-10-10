@@ -400,6 +400,7 @@ td strong { font-weight: 600; }
 .tasks b.l-domain { color: var(--gold); }
 .tasks b.l-app { color: var(--azure); }
 .tasks b.l-infra, .tasks b.l-api, .tasks b.l-lua { color: var(--muted); }
+.tasks b.l-you { color: var(--ok); }
 .tasks ul { margin: 6px 0 0; padding-left: 1.1em; display: grid; gap: 4px; color: var(--muted); font-size: 0.94rem; }
 .side { display: grid; gap: 16px; align-content: start; }
 .side p { font-size: 0.94rem; }
@@ -424,7 +425,7 @@ td strong { font-weight: 600; }
     <h1><span>wow-tts</span> Build Plan</h1>
     <p class="lede">A small layered Web API that turns World of Warcraft quest text into speech with Azure AI Speech, and a small addon that plays it when you open a quest.</p>
     <dl class="meta">
-      <div><dt>Updated</dt><dd>9 Oct 2026</dd></div>
+      <div><dt>Updated</dt><dd>10 Oct 2026</dd></div>
       <div><dt>Repo</dt><dd>MarijaGojkov/wow-tts · private</dd></div>
       <div><dt>Stack</dt><dd>.NET 9 · Controllers · Speech SDK · Lua</dd></div>
       <div><dt>Quests</dt><dd>4,221 imported from cMaNGOS</dd></div>
@@ -1056,6 +1057,42 @@ td strong { font-weight: 600; }
         </div>
       </article>
 
+      <article class="quest is-next" id="phase-9-4">
+        <header>
+          <h3><small>Phase 9.4</small>Word timings and karaoke</h3>
+          <span class="pill next">Zone by zone · Teldrassil done</span>
+        </header>
+        <p class="objective">Every quest line knows when each word is spoken, so the words light up karaoke-style while it plays: first in the viewer, then in game.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Where the timings come from</p>
+            <ul class="tasks">
+              <li><b class="l-infra">Our lines</b>Azure Speech's <code>WordBoundary</code> events while it speaks (standard and HD Omni voices). Free and exact.</li>
+              <li><b class="l-infra">Imported lines</b><strong>Whisper large-v3-turbo on your RTX 2080 Super</strong>, once, for all 6,289 (32 hours). Free, ~0.1–0.3 s precise, about 45–90 minutes.</li>
+            </ul>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li class="checked"><b class="l-you">You</b>CUDA Toolkit 13.4 installed.</li>
+              <li class="checked"><b class="l-you">Model</b><code>ggml-large-v3-turbo.bin</code> (1.6 GB). Whisper on CUDA: ~30× real time, 65% GPU on average, 3.2 GB, up to 84 °C.</li>
+              <li class="checked"><b class="l-infra">Fixed</b>Whisper stopped after 30 seconds on longer lines; it now listens again from just before the last word it heard.</li>
+              <li class="checked"><b class="l-api">Teldrassil</b>83 quests, 147 lines in 2 minutes: 98.3% average match, lowest 80%.</li>
+              <li><b class="l-api">Next zones</b><code>timings --zone "&lt;zone&gt;"</code>, one at a time.</li>
+              <li class="checked"><b class="l-domain">Domain</b><code>WordAligner</code>, <code>WordTiming</code> and <code>AudioTimings</code> (source Azure or Whisper, plus a match score).</li>
+              <li class="checked"><b class="l-infra">Database</b>An <code>AudioTimings</code> table, created in the existing database on startup and removed together with the audio.</li>
+              <li class="checked"><b class="l-infra">Importer</b><code>timings [--limit N] [--redo]</code>: Whisper.net 1.9.1 on CUDA with DTW timestamps, MP3 → 16 kHz (NAudio), resumable, with progress.</li>
+              <li class="checked"><b class="l-app">Matching</b>Heard words aligned with our text like a diff: matched words take their times, the rest are spread by length. Lines below 70% are listed.</li>
+              <li class="checked"><b class="l-api">API and viewer</b><code>timings</code> on each part; the text lights up word by word, and clicking a word jumps there. Tested with an Azure line: 23 of 23 words, in step.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p><p>All imported lines have timings, new lines get Azure's, and the highlighting stays in step with the voice.</p></div>
+            <div><p class="label">Cost</p><p>Free: your GPU and Azure's built-in events</p></div>
+            <div><p class="label">Skills</p><div class="chips"><span class="chip">Whisper.net</span><span class="chip">CUDA</span><span class="chip">Word alignment</span><span class="chip">WordBoundary</span><span class="chip">Audio sync</span></div></div>
+            <div><p class="label">Commit</p><p class="commit">Add word timings and karaoke preview</p></div>
+          </div>
+        </div>
+      </article>
+
       <article class="quest" id="phase-10">
         <header>
           <h3><small>Phase 10</small>The addon</h3>
@@ -1075,10 +1112,11 @@ td strong { font-weight: 600; }
                   <li>optional: read quests without audio aloud with WoW's built-in text-to-speech</li>
                 </ul>
               </li>
+              <li><b class="l-lua">Karaoke subtitles</b>the API writes the word timings into <code>WowTts_Timings.lua</code>; a subtitle bar highlights each word on time, counted from <code>PlaySoundFile</code>.</li>
             </ul>
           </div>
           <div class="side">
-            <div><p class="label">Complete when</p><p>You open a quest in game and hear it, and quests you open are saved after a <code>/reload</code>.</p></div>
+            <div><p class="label">Complete when</p><p>You open a quest in game and hear it with the words lighting up, and quests you open are saved after a <code>/reload</code>.</p></div>
             <div><p class="label">Skills</p><div class="chips"><span class="chip">Addon .toc</span><span class="chip">Lua events</span><span class="chip">PlaySoundFile</span><span class="chip">SavedVariables</span></div></div>
             <div><p class="label">Commit</p><p class="commit">Add WoW addon that plays and captures quests</p></div>
           </div>
@@ -1134,6 +1172,7 @@ td strong { font-weight: 600; }
           <tr><td>Quest data source</td><td>cMaNGOS classic-db for vanilla quests, plus quests captured in game</td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>Quest storage</td><td>SQLite file <code>data/wowtts.db</code> through EF Core, git-ignored</td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>Importer</td><td>Console tool <code>tools/WowTts.Importer</code></td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Word timings</td><td>Azure <code>WordBoundary</code> for lines we generate; Whisper large-v3-turbo on your GPU, once, for the imported ones</td><td class="nowrap">10 Oct 2026</td></tr>
           <tr><td>Text priority</td><td>Captured &gt; CMangos &gt; Sample. Changed text deletes the old MP3s</td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>Zone and map data</td><td>Classic Era client tables from wago.tools: <code>AreaTable</code>, <code>QuestSort</code>, <code>UiMap</code>, <code>UiMapAssignment</code></td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>Map style</td><td>Real WoW map images as background, built by the importer from the game's own map tiles (via wago.tools). No downloading from Wowhead</td><td class="nowrap">8 Oct 2026</td></tr>
@@ -1154,6 +1193,7 @@ td strong { font-weight: 600; }
         <thead><tr><th>#</th><th>Decision</th><th>Options</th><th>Suggestion</th><th>Needed by</th></tr></thead>
         <tbody>
           <tr><td class="num">8</td><td>How the addon folder reaches the game</td><td>Directory junction from the repo, copy by hand</td><td>Junction. One copy, and new audio appears in the game folder at once</td><td class="when">Phase 8</td></tr>
+          <tr><td class="num">12</td><td>Where the karaoke shows in game</td><td>A subtitle bar, or colouring the words in the quest window</td><td>Subtitle bar: it shows the text actually spoken, even where Forever changed the quest window</td><td class="when">Phase 10</td></tr>
           <tr><td class="num">11</td><td>Where Forever is installed</td><td>No WoW install was found on this PC</td><td>Install it here, or tell me where it is. Needed for the addon</td><td class="when">Phase 10</td></tr>
         </tbody>
       </table>
@@ -1169,6 +1209,9 @@ td strong { font-weight: 600; }
       <table>
         <thead><tr><th>Risk</th><th>How we handle it</th></tr></thead>
         <tbody>
+          <tr><td>The CUDA Toolkit won't install, or Whisper won't use the GPU</td><td>Fall back to the processor (<code>small.en</code>, about 4–6 hours) or the Vulkan runtime</td></tr>
+          <tr><td>Some imported audio doesn't say exactly our text</td><td>Only Whisper's timings are used; low match scores are listed for a look</td></tr>
+          <tr><td>Timings drift in game (WoW can't tell a sound's position)</td><td>Count from when <code>PlaySoundFile</code> starts; lines are ~18 seconds, so drift stays small</td></tr>
           <tr><td>Costs add up</td><td>Maximum text length on <code>/api/speech</code>, and quest audio is only generated once</td></tr>
           <tr><td>Anyone who can reach the API spends your Azure credit</td><td>Runs on localhost only. No hosting until authentication is added</td></tr>
           <tr><td>Placeholders get read aloud ("dollar N")</td><td><code>TextCleaner</code> handles them in the Domain layer</td></tr>
@@ -1214,8 +1257,9 @@ td strong { font-weight: 600; }
 
   <section class="next-step" id="next">
     <p class="eyebrow">Next step</p>
-    <h2>Compare the voices, then the addon</h2>
+    <h2>Word timings, then the addon</h2>
     <ol>
+      <li>Install the CUDA Toolkit 13, then build word timings and the karaoke preview (Phase 9.4).</li>
       <li>Listen to the standard and HD versions and pick one (Phase 9.1).</li>
       <li>Phase 10, decision 11: where Forever is installed.</li>
     </ol>

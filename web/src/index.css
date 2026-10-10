@@ -852,6 +852,36 @@ h3 {
   max-width: 70ch;
 }
 
+.karaoke .word {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 0.12s, background-color 0.12s;
+}
+
+.karaoke .word:hover {
+  background: var(--panel-2);
+}
+
+.karaoke .word-spoken {
+  color: var(--muted);
+}
+
+.karaoke .word-current {
+  color: var(--bg);
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
+.timing-badge {
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  color: var(--ok);
+}
+
+.timing-badge.poor {
+  color: var(--danger);
+}
+
 .part-foot {
   display: flex;
   flex-wrap: wrap;

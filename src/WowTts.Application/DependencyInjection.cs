@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<QuestService>();
         services.AddScoped<QuestImportService>();
         services.AddScoped<AudioImportService>();
+        services.AddScoped<TimingImportService>();
         services.AddScoped<GameDataImportService>();
         services.AddScoped<MapService>();
         services.AddScoped<VoiceCastingService>();

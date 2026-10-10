@@ -4,7 +4,7 @@ using WowTts.Domain.Quests;
 namespace WowTts.Application.Import;
 
 // Brings quests from any source (cMaNGOS, samples, later the addon) into the quest store.
-public sealed class QuestImportService(IQuestRepository quests, IAudioStore audioStore)
+public sealed class QuestImportService(IQuestRepository quests, IAudioStore audioStore, ITimingsRepository timings)
 {
     public async Task<ImportResult> ImportAsync(IReadOnlyCollection<Quest> incoming)
     {
@@ -43,6 +43,7 @@ public sealed class QuestImportService(IQuestRepository quests, IAudioStore audi
                 if ((textChanged || speakerChanged) && audioStore.Exists(quest.Id, part))
                 {
                     audioStore.Delete(quest.Id, part);
+                    await timings.DeleteAsync(quest.Id, part);
                     audioDeleted++;
                 }
             }

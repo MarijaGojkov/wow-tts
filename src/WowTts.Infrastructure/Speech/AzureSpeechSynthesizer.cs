@@ -12,14 +12,14 @@ public sealed class AzureSpeechSynthesizer(IOptions<SpeechOptions> options) : IS
 {
     private readonly SpeechOptions _options = options.Value;
 
-    public Task<byte[]> SynthesizeAsync(string text, string? voice) =>
-        SpeakAsync(voice ?? _options.DefaultVoice, synthesizer => synthesizer.SpeakTextAsync(text));
+    public async Task<byte[]> SynthesizeAsync(string text, string? voice) =>
+        (await SpeakAsync(voice ?? _options.DefaultVoice, synthesizer => synthesizer.SpeakTextAsync(text))).Audio;
 
     // Spoken through SSML, so the style, speed and pitch apply.
-    public Task<byte[]> PerformAsync(string text, VoicePerformance performance) =>
+    public Task<SpokenAudio> PerformAsync(string text, VoicePerformance performance) =>
         SpeakAsync(performance.Voice, synthesizer => synthesizer.SpeakSsmlAsync(SsmlBuilder.Build(text, performance)));
 
-    private async Task<byte[]> SpeakAsync(string voice, Func<SpeechSynthesizer, Task<SpeechSynthesisResult>> speak)
+    private async Task<SpokenAudio> SpeakAsync(string voice, Func<SpeechSynthesizer, Task<SpeechSynthesisResult>> speak)
     {
         var config = SpeechConfig.FromSubscription(_options.Key, _options.Region);
         config.SpeechSynthesisVoiceName = voice;
@@ -27,10 +27,25 @@ public sealed class AzureSpeechSynthesizer(IOptions<SpeechOptions> options) : IS
 
         // No audio config: the audio stays in memory (result.AudioData) instead of going to the speakers.
         using var synthesizer = new SpeechSynthesizer(config, audioConfig: null);
+
+        // Azure reports each word as it speaks it. AudioOffset is in ticks (100 nanoseconds).
+        var words = new List<HeardWord>();
+        synthesizer.WordBoundary += (_, e) =>
+        {
+            if (e.BoundaryType != SpeechSynthesisBoundaryType.Word)
+                return;
+            int start = (int)(e.AudioOffset / TimeSpan.TicksPerMillisecond);
+            lock (words)
+                words.Add(new HeardWord(e.Text, start, start + (int)e.Duration.TotalMilliseconds));
+        };
+
         using var result = await speak(synthesizer);
 
         if (result.Reason == ResultReason.SynthesizingAudioCompleted)
-            return result.AudioData;
+        {
+            lock (words)
+                return new SpokenAudio(result.AudioData, words.OrderBy(word => word.StartMs).ToList());
+        }
 
         if (result.Reason == ResultReason.Canceled)
         {

@@ -44,6 +44,23 @@ export interface QuestPartInfo extends QuestPartStatus {
   // Who says it: the quest giver, or the NPC you hand the quest in to.
   speaker: string
   performance: VoicePerformance | null
+  timings: AudioTimings | null
+}
+
+// One word of a part's text (offset and length in the text) and when it's spoken, in milliseconds.
+export interface WordTiming {
+  offset: number
+  length: number
+  startMs: number
+  endMs: number
+}
+
+// When each word of a part's audio is spoken: from Azure while it spoke, or from Whisper listening afterwards.
+// match is the share of words the source confirmed (0 to 1).
+export interface AudioTimings {
+  source: 'azure' | 'whisper'
+  match: number
+  words: WordTiming[]
 }
 
 // An NPC of a quest and the voice cast for them.

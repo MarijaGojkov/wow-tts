@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using WowTts.Application;
+using WowTts.Application.Exceptions;
 using WowTts.Application.Import;
 using WowTts.Domain.Maps;
 using WowTts.Domain.Quests;
@@ -16,12 +17,13 @@ using WowTts.Infrastructure.Persistence;
 //   dotnet run --project tools/WowTts.Importer -- cmangos [path to ClassicDB_*.sql.gz]
 //   dotnet run --project tools/WowTts.Importer -- samples [path to sample-quests.json]
 //   dotnet run --project tools/WowTts.Importer -- voiceover [path to the extracted sound pack] [--replace]
+//   dotnet run --project tools/WowTts.Importer -- timings [--zone NAME] [--limit N] [--redo]
 
 string repoRoot = FindFolderContaining(AppContext.BaseDirectory, "WowTts.sln") ?? Environment.CurrentDirectory;
 string command = args.FirstOrDefault()?.ToLowerInvariant() ?? "";
 string? argument = args.Skip(1).FirstOrDefault();
 
-if (command is not ("gamedata" or "cmangos" or "samples" or "mapimages" or "voiceover"))
+if (command is not ("gamedata" or "cmangos" or "samples" or "mapimages" or "voiceover" or "timings"))
 {
     PrintUsage();
     return 1;
@@ -71,6 +73,57 @@ try
         Console.WriteLine($"Zones and cities:    {read.Zones.Count(z => z.Type == MapZoneType.Zone)}");
         Console.WriteLine($"Quest log headers:   {read.CategoryNames.Count}");
         Console.WriteLine($"Done in {stopwatch.Elapsed.TotalSeconds:0.0} s");
+        return 0;
+    }
+
+    if (command == "timings")
+    {
+        // Word timings for audio that has none (the imported AI VoiceOver lines), from Whisper on the graphics card.
+        string model = Path.Combine(repoRoot, "data", "models", "ggml-large-v3-turbo.bin");
+        if (!File.Exists(model))
+        {
+            Console.Error.WriteLine($"The Whisper model is missing: {model}");
+            Console.Error.WriteLine("Download ggml-large-v3-turbo.bin from https://huggingface.co/ggerganov/whisper.cpp into data/models.");
+            return 1;
+        }
+
+        int? limit = args.SkipWhile(arg => arg != "--limit").Skip(1).Select(arg => int.TryParse(arg, out int n) ? n : (int?)null).FirstOrDefault();
+        string? zone = args.SkipWhile(arg => arg != "--zone").Skip(1).FirstOrDefault();
+        bool redo = args.Contains("--redo", StringComparer.OrdinalIgnoreCase);
+
+        // Ctrl+C finishes the current line and stops; what's done is saved, so the next run carries on.
+        using var stop = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); Console.WriteLine("Stopping after this line…"); };
+
+        Console.WriteLine($"Loading Whisper {Path.GetFileName(model)}");
+        using var whisper = new WhisperWordRecognizer(model);
+        Console.WriteLine($"Whisper runs on: {whisper.Runtime}");
+        if (zone is not null)
+            Console.WriteLine($"Only quests in {zone}");
+
+        var progressClock = Stopwatch.StartNew();
+        TimingImportResult timed = await scope.ServiceProvider.GetRequiredService<TimingImportService>().ImportAsync(
+            whisper, zone, redo, limit,
+            (done, total) =>
+            {
+                if (done % 25 != 0 && done != total)
+                    return;
+                var left = TimeSpan.FromSeconds(progressClock.Elapsed.TotalSeconds / done * (total - done));
+                Console.WriteLine($"  {done,5} of {total}  ({Clock(progressClock.Elapsed)} so far, about {Clock(left)} left)");
+            },
+            stop.Token);
+
+        Console.WriteLine();
+        Console.WriteLine($"Parts with audio:  {timed.WithAudio}");
+        Console.WriteLine($"Already timed:     {timed.AlreadyTimed}");
+        Console.WriteLine($"Timed now:         {timed.Timed}");
+        Console.WriteLine($"Failed:            {timed.Failed}");
+        Console.WriteLine($"Poor matches:      {timed.PoorMatches.Count} (below {TimingImportService.PoorMatchBelow:P0} of the words; the audio may say something else)");
+        foreach (var poor in timed.PoorMatches.Take(15))
+            Console.WriteLine($"  quest {poor.QuestId} {poor.Part.ToString().ToLowerInvariant()}: {poor.Match:P0}");
+        if (timed.Stopped)
+            Console.WriteLine("Stopped early. Run it again to carry on.");
+        Console.WriteLine($"Done in {Clock(stopwatch.Elapsed)}");
         return 0;
     }
 
@@ -143,7 +196,8 @@ try
     Console.WriteLine($"Done in {stopwatch.Elapsed.TotalSeconds:0.0} s");
     return 0;
 }
-catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException or InvalidDataException or HttpRequestException)
+catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException or InvalidDataException or HttpRequestException
+                               or InvalidRequestException)
 {
     Console.Error.WriteLine(ex.Message);
     return 1;
@@ -308,6 +362,9 @@ static async Task DownloadTablesAsync(string folder, IEnumerable<string> tables,
     }
 }
 
+// "01:05:09"
+static string Clock(TimeSpan time) => time.ToString(@"hh\:mm\:ss");
+
 static void PrintUsage()
 {
     Console.WriteLine("Imports data into data/wowtts.db.");
@@ -328,6 +385,12 @@ static void PrintUsage()
     Console.WriteLine("      Quest audio from the AI VoiceOver addon's sound pack (accept and complete, no progress).");
     Console.WriteLine("      Without a path, uses data/voiceover. Parts that already have audio are kept;");
     Console.WriteLine("      --replace overwrites them.");
+    Console.WriteLine();
+    Console.WriteLine("  dotnet run --project tools/WowTts.Importer -- timings [--zone NAME] [--limit N] [--redo]");
+    Console.WriteLine("      Word timings (for karaoke) for audio that has none, from Whisper large-v3-turbo on the");
+    Console.WriteLine("      graphics card. Needs data/models/ggml-large-v3-turbo.bin. Ctrl+C stops; running it again");
+    Console.WriteLine("      carries on. --zone does one zone, e.g. --zone Teldrassil (quote names with spaces);");
+    Console.WriteLine("      --limit N does only N lines; --redo times them again.");
     Console.WriteLine();
     Console.WriteLine("  dotnet run --project tools/WowTts.Importer -- mapimages [--refresh]");
     Console.WriteLine("      The game's world map images, from wago.tools, into web/public/maps/<map id>.png.");

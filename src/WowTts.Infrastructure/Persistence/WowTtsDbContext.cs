@@ -9,6 +9,7 @@ public sealed class WowTtsDbContext(DbContextOptions<WowTtsDbContext> options) :
     public DbSet<QuestCategoryEntity> QuestCategories => Set<QuestCategoryEntity>();
     public DbSet<NpcVoiceEntity> NpcVoices => Set<NpcVoiceEntity>();
     public DbSet<AudioPerformanceEntity> AudioPerformances => Set<AudioPerformanceEntity>();
+    public DbSet<AudioTimingsEntity> AudioTimings => Set<AudioTimingsEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -53,6 +54,14 @@ public sealed class WowTtsDbContext(DbContextOptions<WowTtsDbContext> options) :
             performance.HasKey(p => new { p.QuestId, p.Part });
             performance.Property(p => p.Part).HasConversion<string>().HasMaxLength(20);
             performance.Property(p => p.DirectedBy).HasConversion<string>().HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<AudioTimingsEntity>(timings =>
+        {
+            timings.ToTable("AudioTimings");
+            timings.HasKey(t => new { t.QuestId, t.Part });
+            timings.Property(t => t.Part).HasConversion<string>().HasMaxLength(20);
+            timings.Property(t => t.Source).HasConversion<string>().HasMaxLength(20);
         });
     }
 }
