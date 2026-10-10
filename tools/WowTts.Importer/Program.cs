@@ -5,6 +5,7 @@ using WowTts.Application;
 using WowTts.Application.Import;
 using WowTts.Domain.Maps;
 using WowTts.Domain.Quests;
+using WowTts.Domain.Speech;
 using WowTts.Infrastructure;
 using WowTts.Infrastructure.Imaging;
 using WowTts.Infrastructure.Import;
@@ -14,12 +15,13 @@ using WowTts.Infrastructure.Persistence;
 //   dotnet run --project tools/WowTts.Importer -- gamedata [--refresh]
 //   dotnet run --project tools/WowTts.Importer -- cmangos [path to ClassicDB_*.sql.gz]
 //   dotnet run --project tools/WowTts.Importer -- samples [path to sample-quests.json]
+//   dotnet run --project tools/WowTts.Importer -- voiceover [path to the extracted sound pack] [--replace]
 
 string repoRoot = FindFolderContaining(AppContext.BaseDirectory, "WowTts.sln") ?? Environment.CurrentDirectory;
 string command = args.FirstOrDefault()?.ToLowerInvariant() ?? "";
 string? argument = args.Skip(1).FirstOrDefault();
 
-if (command is not ("gamedata" or "cmangos" or "samples" or "mapimages"))
+if (command is not ("gamedata" or "cmangos" or "samples" or "mapimages" or "voiceover"))
 {
     PrintUsage();
     return 1;
@@ -59,7 +61,7 @@ try
     if (command == "gamedata")
     {
         string folder = Path.Combine(repoRoot, "data", "gamedata");
-        await DownloadTablesAsync(folder, GameDataReader.Tables, refresh: argument == "--refresh");
+        await DownloadTablesAsync(folder, [.. GameDataReader.Tables, .. NpcRaceReader.Tables], refresh: argument == "--refresh");
 
         GameDataReadResult read = GameDataReader.Read(folder);
         await scope.ServiceProvider.GetRequiredService<GameDataImportService>().ImportAsync(read.Zones, read.CategoryNames);
@@ -72,6 +74,32 @@ try
         return 0;
     }
 
+    if (command == "voiceover")
+    {
+        // Ready-made quest audio from the AI VoiceOver addon. Its voices are ElevenLabs clones of the game's own NPC
+        // voices, one per race and gender. Personal use only: the audio has no licence, so it stays out of git.
+        string folder = Path.GetFullPath(args.Skip(1).FirstOrDefault(arg => !arg.StartsWith("--")) ?? Path.Combine(repoRoot, "data", "voiceover"));
+        bool replace = args.Contains("--replace", StringComparer.OrdinalIgnoreCase);
+
+        Console.WriteLine($"Reading the AI VoiceOver sound pack in {folder}");
+        var files = VoiceOverPackReader.Read(folder);
+        Console.WriteLine($"Found {files.Count} quest audio files");
+
+        var performance = VoicePerformance.Imported(
+            "AI VoiceOver",
+            "Imported from the AI VoiceOver addon, whose voices are cloned per race and gender from the game's own NPC voices.");
+        AudioImportResult audio = await scope.ServiceProvider.GetRequiredService<AudioImportService>().ImportAsync(files, performance, replace);
+
+        Console.WriteLine();
+        Console.WriteLine($"Imported:       {audio.Imported}");
+        Console.WriteLine($"Replaced:       {audio.Replaced}");
+        Console.WriteLine($"Kept existing:  {audio.KeptExisting} (already had audio; --replace overwrites it)");
+        Console.WriteLine($"Unknown quest:  {audio.UnknownQuest} (not in the database)");
+        Console.WriteLine($"No such text:   {audio.NoText} (the quest has no text for that part)");
+        Console.WriteLine($"Done in {stopwatch.Elapsed.TotalSeconds:0.0} s");
+        return 0;
+    }
+
     IReadOnlyList<Quest> quests;
     if (command == "cmangos")
     {
@@ -79,11 +107,19 @@ try
             ? Path.GetFullPath(argument)
             : FindNewestDump(Path.Combine(repoRoot, "data", "cmangos"));
 
+        // cMaNGOS has no NPC races; they come from the game's own tables, by each NPC's model.
+        string gameData = Path.Combine(repoRoot, "data", "gamedata");
+        await DownloadTablesAsync(gameData, NpcRaceReader.Tables, refresh: false);
+        var raceByModel = NpcRaceReader.Read(gameData);
+
         Console.WriteLine($"Reading the cMaNGOS dump {path}");
-        QuestReadResult read = CMangosQuestReader.Read(path);
+        QuestReadResult read = CMangosQuestReader.Read(path, raceByModel);
         quests = read.Quests;
 
         Console.WriteLine($"Found {quests.Count} quests");
+        Console.WriteLine($"  quest givers by race: {string.Join(", ", quests
+            .GroupBy(quest => quest.NpcRace).OrderByDescending(group => group.Count()).Select(group => $"{group.Key} {group.Count()}"))}");
+        Console.WriteLine($"  handed in to someone else: {quests.Count(quest => quest.Ender is not null)}");
         foreach (var (reason, count) in read.Skipped)
             Console.WriteLine($"  skipped {count} with {reason}");
     }
@@ -103,7 +139,7 @@ try
     Console.WriteLine($"Updated:        {result.Updated}");
     Console.WriteLine($"Unchanged:      {result.Unchanged}");
     Console.WriteLine($"Kept existing:  {result.KeptExisting} (the database has text from a higher-priority source)");
-    Console.WriteLine($"Audio deleted:  {result.AudioDeleted} (text changed, so the old MP3 no longer matched)");
+    Console.WriteLine($"Audio deleted:  {result.AudioDeleted} (its text or speaker changed, so the old MP3 no longer matched)");
     Console.WriteLine($"Done in {stopwatch.Elapsed.TotalSeconds:0.0} s");
     return 0;
 }
@@ -281,11 +317,17 @@ static void PrintUsage()
     Console.WriteLine("      Downloads them into data/gamedata once; --refresh downloads them again.");
     Console.WriteLine();
     Console.WriteLine("  dotnet run --project tools/WowTts.Importer -- cmangos [path]");
-    Console.WriteLine("      Vanilla quests from the cMaNGOS classic-db dump (.sql.gz or .sql).");
+    Console.WriteLine("      Vanilla quests from the cMaNGOS classic-db dump (.sql.gz or .sql), with NPC races");
+    Console.WriteLine("      from the game's tables on wago.tools (downloaded into data/gamedata once).");
     Console.WriteLine("      Without a path, uses the newest dump in data/cmangos.");
     Console.WriteLine();
     Console.WriteLine("  dotnet run --project tools/WowTts.Importer -- samples [path]");
     Console.WriteLine("      The hand-written test quests. Without a path, uses data/sample-quests.json.");
+    Console.WriteLine();
+    Console.WriteLine("  dotnet run --project tools/WowTts.Importer -- voiceover [path] [--replace]");
+    Console.WriteLine("      Quest audio from the AI VoiceOver addon's sound pack (accept and complete, no progress).");
+    Console.WriteLine("      Without a path, uses data/voiceover. Parts that already have audio are kept;");
+    Console.WriteLine("      --replace overwrites them.");
     Console.WriteLine();
     Console.WriteLine("  dotnet run --project tools/WowTts.Importer -- mapimages [--refresh]");
     Console.WriteLine("      The game's world map images, from wago.tools, into web/public/maps/<map id>.png.");

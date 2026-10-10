@@ -5,6 +5,8 @@ import {
   generateAudio,
   recastVoice,
   type Quest,
+  type QuestNpc,
+  type QuestNpcRole,
   type QuestPartInfo,
   type VoicePerformance,
 } from './api'
@@ -16,19 +18,25 @@ interface QuestDetailProps {
 }
 
 export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
-  const [recasting, setRecasting] = useState(false)
+  const [recasting, setRecasting] = useState<QuestNpcRole | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  async function recast() {
-    setRecasting(true)
+  const giver: QuestNpc = { name: quest.npcName, race: quest.npcRace, gender: quest.npcGender, voice: quest.voice }
+  const speakers: { role: QuestNpcRole; label: string; npc: QuestNpc }[] = [
+    { role: 'giver', label: 'Quest giver', npc: giver },
+    ...(quest.ender ? [{ role: 'ender' as const, label: 'Hand in to', npc: quest.ender }] : []),
+  ]
+
+  async function recast(role: QuestNpcRole) {
+    setRecasting(role)
     setError(null)
     try {
-      await recastVoice(quest.id)
+      await recastVoice(quest.id, role)
       await onChanged()
     } catch (e) {
       setError(errorText(e, 'Recasting the voice failed.'))
     } finally {
-      setRecasting(false)
+      setRecasting(null)
     }
   }
 
@@ -48,27 +56,16 @@ export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
       </header>
 
       <section className="npc" aria-label="Quest details">
-        <div>
-          <p className="label">Quest giver</p>
-          <p className="npc-name">{quest.npcName}</p>
-          <p className="sub">
-            {[quest.npcGender, quest.npcRace].filter((value) => value !== 'Unknown').map(splitWords).join(' ') ||
-              'Gender unknown'}
-          </p>
-        </div>
-        <div className="npc-voice">
-          <p className="label">Voice</p>
-          {quest.voice ? (
-            <>
-              <p title={quest.voice.reason}>{voiceLabel(quest.voice.voice)}</p>
-              <button type="button" className="link-button" onClick={recast} disabled={recasting}>
-                {recasting ? 'Recasting…' : 'Recast'}
-              </button>
-            </>
-          ) : (
-            <p className="sub">Cast on first audio</p>
-          )}
-        </div>
+        {speakers.map(({ role, label, npc }) => (
+          <NpcCells
+            key={role}
+            label={label}
+            npc={npc}
+            recasting={recasting === role}
+            disabled={recasting !== null}
+            onRecast={() => recast(role)}
+          />
+        ))}
         <div>
           <p className="label">Where</p>
           <p>{quest.mapZoneName ?? 'Unknown'}</p>
@@ -103,25 +100,76 @@ export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
         </div>
       </section>
 
-      {quest.voice && <p className="voice-reason">“{quest.voice.reason}”</p>}
+      {speakers.map(
+        ({ role, npc }) =>
+          npc.voice && (
+            <p key={role} className="voice-reason">
+              {quest.ender && `${npc.name}: `}“{npc.voice.reason}”
+            </p>
+          ),
+      )}
       {error && <p className="error">{error}</p>}
 
       <div className="parts">
         {quest.parts.map((part) => (
-          <PartCard key={`${quest.id}-${part.part}`} questId={quest.id} part={part} onChanged={onChanged} />
+          <PartCard
+            key={`${quest.id}-${part.part}`}
+            questId={quest.id}
+            part={part}
+            showSpeaker={quest.ender !== null}
+            onChanged={onChanged}
+          />
         ))}
       </div>
     </article>
   )
 }
 
+// An NPC's name, gender and race, and the voice cast for them with a button to recast it.
+interface NpcCellsProps {
+  label: string
+  npc: QuestNpc
+  recasting: boolean
+  disabled: boolean
+  onRecast: () => void
+}
+
+function NpcCells({ label, npc, recasting, disabled, onRecast }: NpcCellsProps) {
+  return (
+    <>
+      <div>
+        <p className="label">{label}</p>
+        <p className="npc-name">{npc.name}</p>
+        <p className="sub">
+          {[npc.gender, npc.race].filter((value) => value !== 'Unknown').map(splitWords).join(' ') || 'Gender unknown'}
+        </p>
+      </div>
+      <div className="npc-voice">
+        <p className="label">Voice</p>
+        {npc.voice ? (
+          <>
+            <p title={npc.voice.reason}>{voiceLabel(npc.voice.voice)}</p>
+            <button type="button" className="link-button" onClick={onRecast} disabled={disabled}>
+              {recasting ? 'Recasting…' : 'Recast'}
+            </button>
+          </>
+        ) : (
+          <p className="sub">Cast on first audio</p>
+        )}
+      </div>
+    </>
+  )
+}
+
 interface PartCardProps {
   questId: number
   part: QuestPartInfo
+  // Only worth showing when the quest has two speakers.
+  showSpeaker: boolean
   onChanged: () => Promise<void>
 }
 
-function PartCard({ questId, part, onChanged }: PartCardProps) {
+function PartCard({ questId, part, showSpeaker, onChanged }: PartCardProps) {
   const [busy, setBusy] = useState<'generating' | 'regenerating' | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Changes after regenerating, so the browser fetches the new MP3 instead of playing the old one from its cache.
@@ -150,7 +198,10 @@ function PartCard({ questId, part, onChanged }: PartCardProps) {
       <header className="part-head">
         <div>
           <h3>{label.name}</h3>
-          <p className="part-when">{label.when}</p>
+          <p className="part-when">
+            {label.when}
+            {showSpeaker && ` · ${part.speaker}`}
+          </p>
         </div>
         <span className={part.hasAudio ? 'status ready' : 'status missing'}>
           {part.hasAudio ? 'Audio ready' : 'No audio yet'}
@@ -193,9 +244,24 @@ function PerformanceLine({ performance }: { performance: VoicePerformance | null
     return <p className="performance muted">Made before the voice director, so how it was spoken wasn't recorded.</p>
   }
 
+  const badges = { ai: 'AI', default: 'Default', imported: 'Imported' }
+  if (performance.directedBy === 'imported') {
+    return (
+      <div className="performance">
+        <p>
+          <span className="director director-imported">{badges.imported}</span>
+          {performance.voice}
+        </p>
+        <p className="performance-reason">{performance.reason}</p>
+      </div>
+    )
+  }
+
   const details = [
     voiceLabel(performance.voice),
-    performance.style ? `${performance.style} ×${performance.styleDegree}` : 'no style',
+    performance.style
+      ? performance.styleDegree === 1 ? performance.style : `${performance.style} ×${performance.styleDegree}`
+      : 'no style',
     performance.ratePercent !== 0 && `${performance.ratePercent < 0 ? 'slower' : 'faster'} ${Math.abs(performance.ratePercent)}%`,
     performance.pitchPercent !== 0 && `${performance.pitchPercent < 0 ? 'lower' : 'higher'} ${Math.abs(performance.pitchPercent)}%`,
   ].filter(Boolean)
@@ -204,7 +270,7 @@ function PerformanceLine({ performance }: { performance: VoicePerformance | null
     <div className="performance">
       <p>
         <span className={`director director-${performance.directedBy}`}>
-          {performance.directedBy === 'ai' ? 'AI' : 'Default'}
+          {badges[performance.directedBy]}
         </span>
         {details.join(' · ')}
       </p>

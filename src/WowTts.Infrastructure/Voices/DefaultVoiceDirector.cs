@@ -20,9 +20,9 @@ public sealed class DefaultVoiceDirector(IOptions<SpeechOptions> options) : IVoi
             ? _options.DefaultFemaleVoice
             : _options.DefaultMaleVoice;
 
-        string voice = request.Voices.Any(v => v.Name.Equals(preferred, StringComparison.OrdinalIgnoreCase))
-            ? preferred
-            : request.Voices[0].Name;
+        // By persona, so the default voice also works when the voices are HD (en-US-Guy:DragonHDOmniLatestNeural).
+        string voice = request.Voices.FirstOrDefault(v => VoiceInfo.SamePersona(v.Name, preferred))?.Name
+            ?? request.Voices[0].Name;
 
         return Task.FromResult(VoicePerformance.Plain(voice, "Default voice for this gender (no AI voice director set up)."));
     }

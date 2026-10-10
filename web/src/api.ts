@@ -19,7 +19,8 @@ export interface QuestPartStatus {
   hasAudio: boolean
 }
 
-// How a line was spoken: chosen by the AI voice director, or the default when no AI is set up.
+// How a line was spoken: chosen by the AI voice director, the default when no AI is set up,
+// or imported from another addon (voice is then where it came from, e.g. "AI VoiceOver").
 export interface VoicePerformance {
   voice: string
   style: string | null
@@ -27,7 +28,7 @@ export interface VoicePerformance {
   ratePercent: number
   pitchPercent: number
   reason: string
-  directedBy: 'ai' | 'default'
+  directedBy: 'ai' | 'default' | 'imported'
 }
 
 // The voice cast for an NPC, used for all their quests.
@@ -40,8 +41,20 @@ export interface NpcVoice {
 
 export interface QuestPartInfo extends QuestPartStatus {
   text: string
+  // Who says it: the quest giver, or the NPC you hand the quest in to.
+  speaker: string
   performance: VoicePerformance | null
 }
+
+// An NPC of a quest and the voice cast for them.
+export interface QuestNpc {
+  name: string
+  race: string
+  gender: string
+  voice: NpcVoice | null
+}
+
+export type QuestNpcRole = 'giver' | 'ender'
 
 // Fields shared by the list and the detail view.
 interface QuestBase {
@@ -69,6 +82,8 @@ export interface Quest extends QuestBase {
   npcRace: string
   npcGender: string
   voice: NpcVoice | null
+  // The NPC you hand the quest in to, when that's not the quest giver.
+  ender: QuestNpc | null
   parts: QuestPartInfo[]
 }
 
@@ -208,7 +223,7 @@ export function deleteAudio(questId: number, part: QuestPart): Promise<void> {
   return send(audioUrl(questId, part), 'DELETE')
 }
 
-// Forgets the NPC's voice, so the voice director casts a new one for the next audio.
-export function recastVoice(questId: number): Promise<void> {
-  return send(`/api/quests/${questId}/voice`, 'DELETE')
+// Forgets an NPC's voice, so the voice director casts a new one for the next audio.
+export function recastVoice(questId: number, npc: QuestNpcRole): Promise<void> {
+  return send(`/api/quests/${questId}/voice?npc=${npc}`, 'DELETE')
 }

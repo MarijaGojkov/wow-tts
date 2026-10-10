@@ -497,6 +497,8 @@ data/*.db-shm
 data/*.db-wal
 data/cmangos/
 data/gamedata/
+data/voiceover/
+data/compare/
 
 # World map images: Blizzard's art, made by the importer's mapimages command
 web/public/maps/

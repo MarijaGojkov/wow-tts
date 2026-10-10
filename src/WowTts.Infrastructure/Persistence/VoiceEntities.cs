@@ -33,17 +33,22 @@ public sealed class AudioPerformanceEntity
     public VoicePerformance ToDomain() =>
         new(Voice, Style, StyleDegree, RatePercent, PitchPercent, Reason, DirectedBy);
 
-    public static AudioPerformanceEntity From(int questId, QuestPart part, VoicePerformance performance) => new()
+    public static AudioPerformanceEntity From(int questId, QuestPart part, VoicePerformance performance)
     {
-        QuestId = questId,
-        Part = part,
-        Voice = performance.Voice,
-        Style = performance.Style,
-        StyleDegree = performance.StyleDegree,
-        RatePercent = performance.RatePercent,
-        PitchPercent = performance.PitchPercent,
-        Reason = performance.Reason,
-        DirectedBy = performance.DirectedBy,
-        CreatedAt = DateTime.UtcNow,
-    };
+        var row = new AudioPerformanceEntity { QuestId = questId, Part = part };
+        row.CopyFrom(performance);
+        return row;
+    }
+
+    public void CopyFrom(VoicePerformance performance)
+    {
+        Voice = performance.Voice;
+        Style = performance.Style;
+        StyleDegree = performance.StyleDegree;
+        RatePercent = performance.RatePercent;
+        PitchPercent = performance.PitchPercent;
+        Reason = performance.Reason;
+        DirectedBy = performance.DirectedBy;
+        CreatedAt = DateTime.UtcNow;
+    }
 }

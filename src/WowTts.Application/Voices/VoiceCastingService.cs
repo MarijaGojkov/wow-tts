@@ -6,7 +6,8 @@ using WowTts.Domain.Speech;
 
 namespace WowTts.Application.Voices;
 
-// Decides how a quest line is spoken. The first time an NPC speaks, the voice director casts their voice from
+// Decides how a quest line is spoken, by whoever says it: the quest giver for accept, and the NPC you hand the quest
+// in to for progress and complete. The first time an NPC speaks, the voice director casts their voice from
 // all voices of their gender, and it's saved. After that the NPC keeps that voice, and only the style, speed and
 // pitch are decided per line. Whatever the director answers is checked against the real voice list.
 public sealed class VoiceCastingService(
@@ -21,16 +22,18 @@ public sealed class VoiceCastingService(
         if (voices.Count == 0)
             throw new SpeechSynthesisException("The speech service returned no voices.");
 
-        bool isNamedNpc = quest.NpcName.Length > 0 && quest.NpcName != "Unknown";
-        NpcVoice? cast = isNamedNpc ? await npcVoices.GetAsync(quest.NpcName, quest.NpcGender) : null;
+        QuestNpc speaker = quest.SpeakerOf(part);
+        bool isNamedNpc = speaker.Name.Length > 0 && speaker.Name != "Unknown";
+        NpcVoice? cast = isNamedNpc ? await npcVoices.GetAsync(speaker.Name, speaker.Gender) : null;
+        // Matched by persona, so an NPC cast as en-US-TonyNeural keeps Tony when HD voices are switched on, and back.
         VoiceInfo? castVoice = cast is null
             ? null
-            : voices.FirstOrDefault(voice => voice.Name.Equals(cast.Voice, StringComparison.OrdinalIgnoreCase));
+            : voices.FirstOrDefault(voice => VoiceInfo.SamePersona(voice.Name, cast.Voice));
 
-        IReadOnlyList<VoiceInfo> candidates = castVoice is not null ? [castVoice] : ForGender(voices, quest.NpcGender);
+        IReadOnlyList<VoiceInfo> candidates = castVoice is not null ? [castVoice] : ForGender(voices, speaker.Gender);
 
         VoicePerformance performance = await director.DirectAsync(new VoiceDirectionRequest(
-            quest.Title, quest.NpcName, quest.NpcGender, quest.NpcRace, part, spokenText, candidates, castVoice is not null));
+            quest.Title, speaker.Name, speaker.Gender, speaker.Race, part, spokenText, candidates, castVoice is not null));
 
         // The director must pick one of the offered voices. If it didn't, use the most expressive one instead.
         VoiceInfo? chosen = candidates.FirstOrDefault(voice => voice.Name.Equals(performance.Voice, StringComparison.OrdinalIgnoreCase));
@@ -46,11 +49,11 @@ public sealed class VoiceCastingService(
         // Only the AI's casting is kept. A default voice isn't a casting decision, so once an AI is set up
         // it still gets to cast this NPC.
         if (castVoice is null && isNamedNpc && performance.DirectedBy == VoiceDirector.Ai)
-            await npcVoices.SaveAsync(new NpcVoice(quest.NpcName, quest.NpcGender, chosen.Name, performance.Reason));
+            await npcVoices.SaveAsync(new NpcVoice(speaker.Name, speaker.Gender, chosen.Name, performance.Reason));
 
         logger.LogInformation(
             "Quest {QuestId} {Part}: {Npc} speaks as {Voice}, style {Style} x{Degree}, rate {Rate}%, pitch {Pitch}% ({By})",
-            quest.Id, part, quest.NpcName, performance.Voice, performance.Style ?? "none", performance.StyleDegree,
+            quest.Id, part, speaker.Name, performance.Voice, performance.Style ?? "none", performance.StyleDegree,
             performance.RatePercent, performance.PitchPercent, performance.DirectedBy);
 
         return performance;

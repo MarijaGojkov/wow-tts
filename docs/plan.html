@@ -424,7 +424,7 @@ td strong { font-weight: 600; }
     <h1><span>wow-tts</span> Build Plan</h1>
     <p class="lede">A small layered Web API that turns World of Warcraft quest text into speech with Azure AI Speech, and a small addon that plays it when you open a quest.</p>
     <dl class="meta">
-      <div><dt>Updated</dt><dd>7 Oct 2026</dd></div>
+      <div><dt>Updated</dt><dd>9 Oct 2026</dd></div>
       <div><dt>Repo</dt><dd>MarijaGojkov/wow-tts · private</dd></div>
       <div><dt>Stack</dt><dd>.NET 9 · Controllers · Speech SDK · Lua</dd></div>
       <div><dt>Quests</dt><dd>4,221 imported from cMaNGOS</dd></div>
@@ -446,7 +446,7 @@ td strong { font-weight: 600; }
       <li class="done"><a href="#phase-6"><span class="node">6</span>Database</a></li>
       <li class="done"><a href="#phase-7"><span class="node">7</span>Zones</a></li>
       <li class="done"><a href="#phase-8"><span class="node">8</span>Map</a></li>
-      <li class="next"><a href="#phase-9"><span class="node">9</span>AI voices</a></li>
+      <li class="next"><a href="#phase-9-1"><span class="node">9</span>AI voices</a></li>
       <li><a href="#phase-10"><span class="node">10</span>Addon</a></li>
       <li><a href="#phase-11"><span class="node">11</span>Captures</a></li>
     </ol>
@@ -966,10 +966,100 @@ td strong { font-weight: 600; }
         </div>
       </article>
 
-      <article class="quest is-next" id="phase-10">
+      <article class="quest is-next" id="phase-9-1">
+        <header>
+          <h3><small>Phase 9.1</small>Dragon HD Omni voices</h3>
+          <span class="pill next">Testing</span>
+        </header>
+        <p class="objective">Hear whether HD voices sound good enough to switch to.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li class="checked"><b class="l-infra">Setting</b><code>Speech:VoiceModel</code>: <code>Neural</code> (standard voices) or <code>DragonHDOmni</code>.</li>
+              <li class="checked"><b class="l-infra">Voices</b>Azure lists only 13 English Omni voices, but most standard voices have one (<code>en-GB-RyanNeural</code> → <code>en-GB-Ryan:DragonHDOmniLatestNeural</code>). Checked one by one: 86 of the 126 English voices have one; the rest (Multilingual, Indic and 4 others) are left out.</li>
+              <li class="checked"><b class="l-domain">Domain</b>An NPC keeps their person across both: Kaltunk's Tony became Tony HD. HD voices get no speed, pitch or style strength.</li>
+              <li class="checked"><b class="l-infra">SSML and AI</b>Every Omni voice has the same ~60 styles; paragraphs replace pauses. The AI director knows when voices are HD.</li>
+              <li>Compare <code>data/compare/</code>'s standard MP3s with the HD ones and pick one.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">So far</p>
+              <ul>
+                <li>✓ Works on the free F0 resource</li>
+                <li>✓ Kaltunk: Tony HD, amused</li>
+                <li>✓ Sten Stoutarm: Thomas (British) HD, amused</li>
+              </ul>
+            </div>
+            <div><p class="label">Cost</p><p>$22 per million characters, about 2 cents a quest</p></div>
+            <div><p class="label">Commit</p><p class="commit">Add Dragon HD Omni voices</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-9-2">
+        <header>
+          <h3><small>Phase 9.2</small>NPC races and who hands in</h3>
+          <span class="pill done">Done</span>
+        </header>
+        <p class="objective">The voice director knows each NPC's race, and every line is spoken by the NPC who really says it.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li class="checked"><b class="l-infra">Races</b>cMaNGOS stores only an NPC's model. The game client's tables (<code>CreatureDisplayInfo</code> → <code>CreatureDisplayInfoExtra</code> → <code>ChrRaces</code>) give the race of 92% of quest givers; the rest get their creature type (Undead, Dragonkin, Elemental…).</li>
+              <li class="checked"><b class="l-infra">Who hands in</b><code>creature_involvedrelation</code>: 1,730 quests are handed in to someone else, who now speaks progress and complete.</li>
+              <li class="checked"><b class="l-domain">Domain</b><code>QuestNpc</code>, <code>Quest.Ender</code> and <code>Quest.SpeakerOf(part)</code>; casting uses the speaker.</li>
+              <li class="checked"><b class="l-infra">Database</b>Three new columns added in place on startup, so cast voices and performances stay. 3 MP3s spoken by the wrong NPC were removed.</li>
+              <li class="checked"><b class="l-api">API and viewer</b>Both NPCs with their voice and Recast (<code>?npc=ender</code>); each part says who speaks it.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Complete when</p>
+              <ul>
+                <li>✓ Kaltunk and Gornek are Orcs</li>
+                <li>✓ Gornek speaks the complete line as Roger (HD), Kaltunk keeps Tony</li>
+              </ul>
+            </div>
+            <div><p class="label">Commit</p><p class="commit">Add NPC races and quest enders</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-9-3">
+        <header>
+          <h3><small>Phase 9.3</small>Import AI VoiceOver audio</h3>
+          <span class="pill done">Done</span>
+        </header>
+        <p class="objective">Vanilla quests get real race voices (a dwarf sounds like a WoW dwarf) without generating them.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li class="checked"><b class="l-infra">Reader</b><code>VoiceOverPackReader</code>: <code>generatedsoundsquests&lt;id&gt;-&lt;accept|complete&gt;.mp3</code> from the AI VoiceOver vanilla pack (~1 GB). The <code>m-</code> copy wins for gendered lines. Progress isn't voiced.</li>
+              <li class="checked"><b class="l-app">Application</b><code>AudioImportService</code>: copies into the audio folder and records each part as <strong>Imported</strong>. Existing audio is kept unless <code>--replace</code>.</li>
+              <li class="checked"><b class="l-api">Importer and viewer</b><code>voiceover [path] [--replace]</code>; a green Imported badge in the viewer.</li>
+              <li class="checked"><b class="l-infra">Imported</b><code>AI_VoiceOverData_Vanilla-v1.0.0.zip</code> (CurseForge, 1.1 GB): <strong>6,289 parts</strong> imported, 15 of ours kept. 6,307 of 10,962 parts now have audio; what's left is mostly progress text.</li>
+              <li class="checked"><b class="l-infra">Only AI VoiceOver</b>Our 18 generated parts moved to <code>data/generated-backup/</code>; 15 refilled from the pack, 3 progress parts left without audio. 6,305 parts have audio.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Checked</p>
+              <ul>
+                <li>✓ Test pack: gender pick, kept audio, unknown quests skipped</li>
+                <li>✓ 6,289 parts imported in 7 seconds</li>
+              </ul>
+            </div>
+            <div><p class="label">Note</p><p>Cloned from Blizzard's voice actors, no licence: personal use, never in git</p></div>
+            <div><p class="label">Commit</p><p class="commit">Import AI VoiceOver audio</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="quest" id="phase-10">
         <header>
           <h3><small>Phase 10</small>The addon</h3>
-          <span class="pill next">Next</span>
+          <span class="pill">Planned</span>
         </header>
         <p class="objective">Open a quest in game and hear it. Quests without audio are saved, so the API can add them.</p>
         <div class="quest-body">
@@ -1048,9 +1138,13 @@ td strong { font-weight: 600; }
           <tr><td>Zone and map data</td><td>Classic Era client tables from wago.tools: <code>AreaTable</code>, <code>QuestSort</code>, <code>UiMap</code>, <code>UiMapAssignment</code></td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>Map style</td><td>Real WoW map images as background, built by the importer from the game's own map tiles (via wago.tools). No downloading from Wowhead</td><td class="nowrap">8 Oct 2026</td></tr>
           <tr><td>Voice director</td><td>Azure OpenAI picks voice and performance; standard neural voices with styles; same NPC keeps the same voice</td><td class="nowrap">9 Oct 2026</td></tr>
+          <tr><td>NPC race</td><td>From the game client's model tables (92% of quest givers), else the creature type from cMaNGOS</td><td class="nowrap">9 Oct 2026</td></tr>
+          <tr><td>Who speaks progress and complete</td><td>The NPC you hand the quest in to, when that's not the quest giver</td><td class="nowrap">9 Oct 2026</td></tr>
+          <tr><td>New database columns</td><td>Added in place on startup, so cast voices and performances survive</td><td class="nowrap">9 Oct 2026</td></tr>
+          <tr><td>Voice model</td><td>A switch between standard and Dragon HD Omni voices (<code>Speech:VoiceModel</code>). Omni is on while you compare</td><td class="nowrap">9 Oct 2026</td></tr>
           <tr><td>Voice director model</td><td><code>gpt-5-mini</code> on Foundry, through Azure OpenAI's v1 API with the OpenAI SDK, reasoning effort low</td><td class="nowrap">9 Oct 2026</td></tr>
           <tr><td>Azure resources</td><td>Speech stays on the free F0 resource; the Foundry resource <code>wow-agents-marija2000</code> only hosts the GPT model for the voice director</td><td class="nowrap">9 Oct 2026</td></tr>
-          <tr><td>Ready-made audio packs</td><td>Not used: no clear license, and voice-cloned from Blizzard audio. Audio is generated on demand</td><td class="nowrap">8 Oct 2026</td></tr>
+          <tr><td>Ready-made audio packs</td><td>AI VoiceOver's English vanilla pack is imported for personal use (real race voices); cloned from Blizzard's voice actors with no licence, so it stays out of git. The rest is generated</td><td class="nowrap">10 Oct 2026</td></tr>
         </tbody>
       </table>
     </div>
@@ -1060,9 +1154,7 @@ td strong { font-weight: 600; }
         <thead><tr><th>#</th><th>Decision</th><th>Options</th><th>Suggestion</th><th>Needed by</th></tr></thead>
         <tbody>
           <tr><td class="num">8</td><td>How the addon folder reaches the game</td><td>Directory junction from the repo, copy by hand</td><td>Junction. One copy, and new audio appears in the game folder at once</td><td class="when">Phase 8</td></tr>
-          <tr><td class="num">9</td><td>NPC race for imported quests</td><td>Leave as Unknown, or read it from the game's client data</td><td>Unknown for now. Only needed for voices per race</td><td class="when">Later</td></tr>
           <tr><td class="num">11</td><td>Where Forever is installed</td><td>No WoW install was found on this PC</td><td>Install it here, or tell me where it is. Needed for the addon</td><td class="when">Phase 10</td></tr>
-          <tr><td class="num">10</td><td>Who speaks the progress and complete text</td><td>The quest giver (now), or the NPC you hand it in to</td><td>Store both NPCs. E.g. 783 is given by Deputy Willem but handed in to Marshal McBride. Testing Phase 9 hit it: Gornek's complete line got Kaltunk's voice</td><td class="when">NPC voices</td></tr>
         </tbody>
       </table>
     </div>
@@ -1122,10 +1214,10 @@ td strong { font-weight: 600; }
 
   <section class="next-step" id="next">
     <p class="eyebrow">Next step</p>
-    <h2>Phase 10: The addon</h2>
+    <h2>Compare the voices, then the addon</h2>
     <ol>
-      <li>Decision 11: where Forever is installed.</li>
-      <li>Decision 10: store the NPC you hand a quest in to, so progress and complete lines get their own voice.</li>
+      <li>Listen to the standard and HD versions and pick one (Phase 9.1).</li>
+      <li>Phase 10, decision 11: where Forever is installed.</li>
     </ol>
   </section>
 

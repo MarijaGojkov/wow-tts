@@ -49,4 +49,26 @@ public sealed class SqlitePerformanceRepository(WowTtsDbContext db) : IPerforman
 
     public Task DeleteAsync(int questId, QuestPart part) =>
         db.AudioPerformances.Where(p => p.QuestId == questId && p.Part == part).ExecuteDeleteAsync();
+
+    // In one transaction, for imports of thousands of parts.
+    public async Task SaveManyAsync(IReadOnlyCollection<(AudioKey Key, VoicePerformance Performance)> performances)
+    {
+        if (performances.Count == 0)
+            return;
+
+        var questIds = performances.Select(item => item.Key.QuestId).Distinct().ToList();
+        var existing = await db.AudioPerformances
+            .Where(p => questIds.Contains(p.QuestId))
+            .ToDictionaryAsync(p => new AudioKey(p.QuestId, p.Part));
+
+        foreach (var (key, performance) in performances)
+        {
+            if (existing.TryGetValue(key, out var row))
+                row.CopyFrom(performance);
+            else
+                db.AudioPerformances.Add(AudioPerformanceEntity.From(key.QuestId, key.Part, performance));
+        }
+
+        await db.SaveChangesAsync();
+    }
 }

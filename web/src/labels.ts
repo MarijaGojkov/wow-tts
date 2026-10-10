@@ -37,10 +37,15 @@ export function errorText(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
 }
 
-// "en-US-DavisNeural" -> "Davis (US)", "en-GB-RyanNeural" -> "Ryan (GB)"
+// "en-US-DavisNeural" -> "Davis (US)", "en-GB-RyanNeural" -> "Ryan (GB)",
+// "en-US-Davis:DragonHDOmniLatestNeural" -> "Davis (US, HD)"
 export function voiceLabel(voice: string): string {
-  const [, region, name] = voice.split('-')
-  return name ? `${name.replace(/(Multilingual)?Neural$/, '')} (${region})` : voice
+  const [persona, model] = voice.split(':')
+  const [, region, name] = persona.split('-')
+  if (!name) return voice
+  const shortName = name.replace(/(Multilingual)?Neural$/, '')
+  const capitalized = shortName.charAt(0).toUpperCase() + shortName.slice(1)
+  return `${capitalized} (${region.toUpperCase()}${model ? ', HD' : ''})`
 }
 
 // "NightElf" -> "Night Elf"

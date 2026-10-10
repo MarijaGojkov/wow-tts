@@ -914,6 +914,11 @@ audio {
   color: var(--gold);
 }
 
+.director-imported {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
 .director-default {
   background: var(--panel-2);
   color: var(--muted);

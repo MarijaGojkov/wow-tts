@@ -26,12 +26,18 @@ public sealed class QuestEntity
     public double? GiverX { get; set; }
     public double? GiverY { get; set; }
 
+    // The NPC you hand the quest in to, when it isn't the quest giver.
+    public string? EnderName { get; set; }
+    public string? EnderRace { get; set; }
+    public string? EnderGender { get; set; }
+
     public DateTime UpdatedAt { get; set; }
 
     public Quest ToDomain() => new(
         Id, Title, NpcName, NpcRace, NpcGender, AcceptText, ProgressText, CompleteText, Source,
         Level, MinLevel, Side, CategoryId,
-        GiverMapId is int mapId && GiverX is double x && GiverY is double y ? new WorldLocation(mapId, x, y) : null);
+        GiverMapId is int mapId && GiverX is double x && GiverY is double y ? new WorldLocation(mapId, x, y) : null,
+        EnderName is string name ? new QuestNpc(name, EnderRace ?? "Unknown", EnderGender ?? "Unknown") : null);
 
     public void CopyFrom(Quest quest)
     {
@@ -51,6 +57,9 @@ public sealed class QuestEntity
         GiverMapId = quest.GiverLocation?.MapId;
         GiverX = quest.GiverLocation?.X;
         GiverY = quest.GiverLocation?.Y;
+        EnderName = quest.Ender?.Name;
+        EnderRace = quest.Ender?.Race;
+        EnderGender = quest.Ender?.Gender;
         UpdatedAt = DateTime.UtcNow;
     }
 }

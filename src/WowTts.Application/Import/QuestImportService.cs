@@ -34,10 +34,13 @@ public sealed class QuestImportService(IQuestRepository quests, IAudioStore audi
                 continue;
             }
 
-            // Saved audio was made from the old text, so remove it. It's regenerated on the next request.
+            // Saved audio made from the old text, or spoken by someone else (e.g. the quest giver instead of the
+            // NPC you hand it in to), no longer fits, so remove it. It's regenerated on the next request.
             foreach (QuestPart part in Enum.GetValues<QuestPart>())
             {
-                if (current.GetText(part) != quest.GetText(part) && audioStore.Exists(quest.Id, part))
+                bool textChanged = current.GetText(part) != quest.GetText(part);
+                bool speakerChanged = !current.SpeakerOf(part).IsSameNpc(quest.SpeakerOf(part));
+                if ((textChanged || speakerChanged) && audioStore.Exists(quest.Id, part))
                 {
                     audioStore.Delete(quest.Id, part);
                     audioDeleted++;
@@ -66,5 +69,6 @@ public sealed class QuestImportService(IQuestRepository quests, IAudioStore audi
         && a.MinLevel == b.MinLevel
         && a.Side == b.Side
         && a.CategoryId == b.CategoryId
-        && a.GiverLocation == b.GiverLocation;
+        && a.GiverLocation == b.GiverLocation
+        && a.Ender == b.Ender;
 }

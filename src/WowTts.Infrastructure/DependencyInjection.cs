@@ -28,6 +28,9 @@ public static class DependencyInjection
             .Validate(
                 options => !string.IsNullOrWhiteSpace(options.Key) && !string.IsNullOrWhiteSpace(options.Region),
                 "SPEECH_KEY and SPEECH_REGION must both be set. Set them with setx, then open a new terminal.")
+            .Validate(
+                options => options.UsesHdVoices || options.VoiceModel.Equals(SpeechOptions.Neural, StringComparison.OrdinalIgnoreCase),
+                $"Speech:VoiceModel in appsettings.json must be \"{SpeechOptions.Neural}\" or \"{SpeechOptions.DragonHDOmni}\".")
             .ValidateOnStart();
 
         services.AddSingleton<ISpeechSynthesizer, AzureSpeechSynthesizer>();

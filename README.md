@@ -41,6 +41,17 @@ Any URL Microsoft Foundry shows for the resource works as the endpoint: the Azur
 
 Without them, quest lines use the default voices (`DefaultMaleVoice` and `DefaultFemaleVoice` in `appsettings.json`) and no style. Restart the API, and Visual Studio if you run it from there, after setting them.
 
+### Standard or HD voices
+
+`Speech:VoiceModel` in `appsettings.json` picks which voices quest lines use:
+
+| Value | Voices |
+|---|---|
+| `Neural` | The standard voices. A few have styles, and speed and pitch can be changed. $15 per million characters, or free within F0's monthly allowance |
+| `DragonHDOmni` | Dragon HD Omni versions of the same voices. Much more natural, and every voice has the same ~60 styles, but speed, pitch and style strength can't be changed. $22 per million characters (East US) |
+
+An NPC keeps the same person when you switch, e.g. `en-US-TonyNeural` becomes `en-US-Tony:DragonHDOmniLatestNeural`. Existing MP3s stay as they are until you regenerate them. Restart the API after changing it.
+
 ## Quest data
 
 Quests live in a SQLite database, `data/wowtts.db` (git-ignored). Fill it with the importer, run from the repo folder:
@@ -49,12 +60,17 @@ Quests live in a SQLite database, `data/wowtts.db` (git-ignored). Fill it with t
 # zone names and the world map (Classic Era client tables from wago.tools, downloaded into data/gamedata once)
 dotnet run --project tools/WowTts.Importer -- gamedata
 
-# ~4,200 vanilla quests from the cMaNGOS classic-db dump
-# (download ClassicDB_*.sql.gz from https://github.com/cmangos/classic-db/tree/master/Full_DB into data/cmangos)
+# ~4,200 vanilla quests from the cMaNGOS classic-db dump, with who gives and who takes back each quest
+# (download ClassicDB_*.sql.gz from https://github.com/cmangos/classic-db/tree/master/Full_DB into data/cmangos).
+# NPC races come from the game's model tables on wago.tools, downloaded into data/gamedata once
 dotnet run --project tools/WowTts.Importer -- cmangos
 
 # the 5 hand-written test quests
 dotnet run --project tools/WowTts.Importer -- samples
+
+# ready-made quest audio from the AI VoiceOver addon's English vanilla sound pack (personal use, git-ignored):
+# extract AI_VoiceOverData_Vanilla into data/voiceover first. --replace overwrites audio you already have
+dotnet run --project tools/WowTts.Importer -- voiceover
 ```
 
 If the API or importer says the database was created by an older version, delete `data/wowtts.db` and run `gamedata` and `cmangos` again.

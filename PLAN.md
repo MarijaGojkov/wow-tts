@@ -1,7 +1,7 @@
 # wow-tts implementation plan
 
-**Updated:** 8 October 2026
-**Status:** Phases 0–9 are done. Next is Phase 10, the addon.
+**Updated:** 9 October 2026
+**Status:** Phases 0–9, 9.2 (NPC races, who hands in) and 9.3 (AI VoiceOver audio, 6,289 parts) are done. Dragon HD Omni voices (9.1) are being compared. Next is Phase 10, the addon.
 **Scope for starters:** speech, quests, a quest viewer and a small addon. No tests, batch jobs or voices endpoint yet.
 **Game:** World of Warcraft: Forever (launches 4 November 2026). About 5,200 quests: roughly 3,600 unchanged vanilla quests, 616 changed and 1,001 new.
 
@@ -341,11 +341,56 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 - **Viewer:** each part shows its voice, style, speed, pitch, whether AI or the default chose it, and the reason. **Regenerate** per part, **Recast** for the NPC
 - **Checked:** Azure accepts the SSML (Davis, angry ×1.5, 10% slower, 15% lower, with `&` and `<` escaped). Without an AI, generating falls back to the default voice
 - [x] **Connected:** `gpt-5-mini` on the Foundry resource `wow-agents-marija2000`. Kaltunk (quest 4641) was cast as Tony, unfriendly ×1.2, 10% slower and lower: "gruff, approving and mildly mocking". His next part kept Tony. About 3–7 seconds per line
-- The test showed decision 10: the complete line is Gornek's, but got Kaltunk's voice
+- The test showed the complete line is Gornek's, but got Kaltunk's voice. Fixed in Phase 9.2
 
 **Done when:** with Azure OpenAI connected, generating a quest part shows "AI" with a fitting voice, style and reason, and the same NPC keeps their voice on their next quest.
 **Skills:** Azure OpenAI in Microsoft Foundry, structured outputs (JSON schema), SSML styles and prosody, prompt design.
 **Commit:** `Add AI voice director`
+
+### Phase 9.1: Dragon HD Omni voices (testing)
+
+**Goal:** hear whether HD voices sound good enough to switch to.
+
+- `Speech:VoiceModel` in `appsettings.json`: `Neural` (standard voices) or `DragonHDOmni`
+- Azure lists only 13 English Omni voices, but most standard voices have one: `en-GB-RyanNeural` → `en-GB-Ryan:DragonHDOmniLatestNeural`. Checked one by one: 86 of the 126 English voices have one. The Multilingual and Indic voices and 4 others don't, so they're left out
+- Every Omni voice has the same ~60 styles (angry, annoyed, amused, whispering, shouting, terrified…). Speed, pitch and style strength can't be changed, and paragraphs replace pauses
+- An NPC keeps their person across both: Kaltunk's `en-US-TonyNeural` became `en-US-Tony:DragonHDOmniLatestNeural`
+- The AI director is told when voices are HD, and gets the shared style list once instead of with every voice
+- **Checked:** the free F0 resource accepts Omni voices. Kaltunk (Tony HD, amused) and Sten Stoutarm (Thomas, British HD, amused) generate in about 10 seconds. The standard versions are kept in `data/compare/` to compare by ear
+- **Cost:** $22 per million characters in East US, about 2 cents a quest. The pricing page says F0's free characters don't include HD voices, so keep an eye on usage
+
+**Done when:** you've compared both and picked one.
+**Commit:** `Add Dragon HD Omni voices`
+
+### Phase 9.2: NPC races and who hands in ✅
+
+**Goal:** the voice director knows each NPC's race, and every line is spoken by the NPC who really says it.
+
+- [x] **Races:** cMaNGOS stores only an NPC's model, not its race, because the server never needs it. The game client's tables (`CreatureDisplayInfo` → `CreatureDisplayInfoExtra.DisplayRaceID` → `ChrRaces`, from wago.tools) give the race of 92% of quest givers. The rest get their creature type from cMaNGOS (Humanoid, Undead, Dragonkin, Demon, Elemental, Mechanical…). `NpcRaceReader`, used by the `cmangos` import
+- [x] **Who hands in:** `creature_involvedrelation` gives the NPC you hand each quest in to. 1,730 quests are handed in to someone else, who now speaks the progress and complete text. E.g. Kaltunk gives 4641, Gornek takes it back
+- [x] **Domain:** `QuestNpc` (name, race, gender), `Quest.Ender` and `Quest.SpeakerOf(part)`. Casting and the voice director use the speaker
+- [x] **Database:** three new columns (`EnderName`, `EnderRace`, `EnderGender`), added to an existing database on startup, so cast voices and performances stay. Re-importing deleted the 3 MP3s spoken by the wrong NPC
+- [x] **API and viewer:** `ender` on a quest and `speaker` on each part. Both NPCs show with their voice and a Recast button (`DELETE /api/quests/{id}/voice?npc=ender`)
+- **Checked:** Kaltunk and Gornek are Orcs; Gornek was cast as Roger (HD), "confident", Kaltunk keeps Tony
+
+**Commit:** `Add NPC races and quest enders`
+
+### Phase 9.3: Import AI VoiceOver audio ✅
+
+**Goal:** vanilla quests get real race voices (a dwarf sounds like a WoW dwarf) without generating them.
+
+- The AI VoiceOver addon's English vanilla pack (`AI_VoiceOverData_Vanilla`, about 1 GB, from CurseForge) has quest audio made with ElevenLabs clones of the game's own NPC voices, one per race and gender. Files are `generatedsoundsquests<quest id>-<accept|complete>.mp3`, with `m-`/`f-` copies for lines that change with the player's gender. Progress text isn't voiced
+- Importer command `voiceover [path] [--replace]` (default `data/voiceover`, git-ignored): copies each file to `addon/WowTts/audio/<id>-<part>.mp3` and records it as **Imported** with source "AI VoiceOver". Parts that already have audio are kept unless `--replace`. The `m-` copy is used, like our `$G` handling
+- `AudioImportService` (Application), `VoiceOverPackReader` (Infrastructure), `VoiceDirector.Imported`, a batch `SaveManyAsync` for performances
+- Viewer: imported parts show a green **Imported** badge with the source. **Regenerate** still replaces one with our own voice
+- **Checked** with a small test pack: the `m-` file wins, existing audio is kept, unknown quests and parts without text are skipped
+- [x] **Imported** `AI_VoiceOverData_Vanilla-v1.0.0.zip` (CurseForge, MrThinger, 1.1 GB, extracted to `data/voiceover`): 6,427 quest parts found, **6,289 imported**, 15 kept (generated by us), 59 for quests not in the database, 64 for parts without text. 6,307 of 10,962 parts now have audio, 870 MB. What's left is mostly progress text
+- [x] **Only AI VoiceOver audio now:** our own 18 generated parts were moved to `data/generated-backup/` (git-ignored), and 15 of them were filled from the pack. The 3 progress parts it doesn't voice (16, 7674, 7675) have no audio. NPC voice castings are kept for later. 6,305 parts have audio
+- Personal use only: the audio is cloned from Blizzard's voice actors and has no licence, so it never goes into git
+
+**Done when:** the pack is imported and vanilla quests play with race voices in the viewer.
+**Commit:** `Import AI VoiceOver audio`
+
 ### Phase 10: The addon
 
 **Goal:** open a quest in game and hear it. Quests without audio are saved, so the API can add them.
@@ -399,9 +444,13 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 | Text priority | Captured > CMangos > Sample. Changed text deletes the old MP3s | 8 Oct 2026 |
 | Zone and map data | Classic Era client tables from wago.tools: `AreaTable`, `QuestSort`, `UiMap`, `UiMapAssignment` | 8 Oct 2026 |
 | Map style | Real WoW map images as the background, built by the importer from the game's own map tiles (via wago.tools). Zones and quest givers drawn on top. No downloading from Wowhead | 9 Oct 2026 |
+| NPC race | From the game client's model tables (92% of quest givers), else the creature type from cMaNGOS | 9 Oct 2026 |
+| Who speaks progress and complete | The NPC you hand the quest in to (`creature_involvedrelation`), when that's not the quest giver | 9 Oct 2026 |
+| New database columns | Added in place on startup (`DatabaseSetup.AddedColumns`), so cast voices and performances survive. Migrations later, if needed | 9 Oct 2026 |
+| Voice model | A switch between standard and Dragon HD Omni voices (`Speech:VoiceModel`). Omni is on while you compare | 9 Oct 2026 |
 | Voice director model | `gpt-5-mini` on Foundry, through Azure OpenAI's v1 API with the OpenAI SDK, reasoning effort low | 9 Oct 2026 |
 | Azure resources | Speech stays on the free F0 resource `wow-speech-marija2000`. The Foundry resource `wow-agents-marija2000` (East US) only hosts the GPT model for the voice director. Moving Speech to Foundry later is just a change of `SPEECH_KEY` and `SPEECH_REGION` | 9 Oct 2026 |
-| Ready-made audio packs | Not used. AI VoiceOver's packs have no clear license and are voice-cloned from Blizzard audio. Audio is generated on demand instead | 8 Oct 2026 |
+| Ready-made audio packs | AI VoiceOver's English vanilla pack is imported for personal use (real race voices). Its audio is cloned from Blizzard's voice actors and has no licence, so it stays out of git. Everything it doesn't cover (progress text, Forever's new and changed quests) is generated | 10 Oct 2026 (was: not used, 8 Oct) |
 
 ### Open
 
@@ -409,8 +458,6 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 |---|---|---|---|---|
 | 8 | How the addon folder reaches the game | Directory junction from the repo, copy by hand | Junction. One copy, and new audio appears in the game folder at once | Phase 10 |
 | 11 | Where Forever is installed | No WoW install was found on this PC | Install it here, or tell me where it is. Needed for the addon | Phase 10 |
-| 9 | NPC race for imported quests | Leave as Unknown, or read it from the game's client data (CreatureDisplayInfoExtra) | Unknown for now. Only needed for voices per race | Later |
-| 10 | Who speaks the progress and complete text | The quest giver (now), or the NPC you hand the quest in to (`creature_involvedrelation`) | Store both NPCs, so voices match who's talking. E.g. 783 is given by Deputy Willem but handed in to Marshal McBride. Testing Phase 9 hit it: Gornek's complete line got Kaltunk's voice | Soon |
 
 ## Risks
 
@@ -449,8 +496,8 @@ Once speech and quests work, these are the natural next steps:
 
 ## Next step
 
-1. Decision 11: where Forever is installed, for the addon (Phase 10).
-2. Decision 10: store the NPC you hand a quest in to, so progress and complete lines get their own voice.
+1. Compare the standard and HD voices, and the imported AI VoiceOver ones, and pick (Phase 9.1).
+2. Decision 11: where Forever is installed, for the addon (Phase 10).
 
 ## Notes
 

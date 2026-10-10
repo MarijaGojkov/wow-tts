@@ -91,6 +91,7 @@ public sealed class QuestService(
                 return new QuestPartDto(
                     part,
                     TextCleaner.Clean(quest.GetText(part)!),
+                    quest.SpeakerOf(part).Name,
                     hasAudio,
                     hasAudio ? performed.GetValueOrDefault(part) : null);
             })
@@ -102,6 +103,9 @@ public sealed class QuestService(
             quest.CategoryId, lookup.CategoryName(quest.CategoryId),
             zone?.Id, zone?.Name, MapPosition(quest, zone),
             await npcVoices.GetAsync(quest.NpcName, quest.NpcGender),
+            quest.Ender is QuestNpc ender
+                ? new QuestNpcDto(ender.Name, ender.Race, ender.Gender, await npcVoices.GetAsync(ender.Name, ender.Gender))
+                : null,
             parts);
     }
 
@@ -186,12 +190,15 @@ public sealed class QuestService(
         await performances.DeleteAsync(id, part);
     }
 
-    // Forgets the voice cast for this quest's NPC, so the director casts a new one next time.
+    // Forgets the voice cast for one of this quest's NPCs, so the director casts a new one next time.
     // Audio that already exists keeps its old voice until it's regenerated.
-    public async Task RecastAsync(int id)
+    public async Task RecastAsync(int id, QuestNpcRole role)
     {
         Quest quest = await GetQuestAsync(id);
-        await npcVoices.DeleteAsync(quest.NpcName, quest.NpcGender);
+        QuestNpc npc = role == QuestNpcRole.Ender
+            ? quest.Ender ?? throw new InvalidRequestException($"Quest {id} is handed in to its quest giver, so it has no other NPC to recast.")
+            : quest.Giver;
+        await npcVoices.DeleteAsync(npc.Name, npc.Gender);
     }
 
     private async Task<Quest> GetQuestAsync(int id)
@@ -243,6 +250,7 @@ public sealed class QuestService(
             bool found = quest.Id.ToString() == term
                 || quest.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
                 || quest.NpcName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || (quest.Ender?.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
                 || (lookup.CategoryName(quest.CategoryId)?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false);
 
             if (!found)

@@ -2,7 +2,8 @@ using WowTts.Domain.Maps;
 
 namespace WowTts.Domain.Quests;
 
-// A quest and what its quest giver says at each step.
+// A quest and what is said at each step: the quest giver offers it, and the NPC you hand it in to
+// (often someone else) speaks the progress and complete text.
 public sealed class Quest
 {
     public Quest(
@@ -19,7 +20,8 @@ public sealed class Quest
         int? minLevel = null,
         QuestSide side = QuestSide.Both,
         int? categoryId = null,
-        WorldLocation? giverLocation = null)
+        WorldLocation? giverLocation = null,
+        QuestNpc? ender = null)
     {
         if (id <= 0)
             throw new ArgumentOutOfRangeException(nameof(id), id, "A quest ID must be positive.");
@@ -48,15 +50,21 @@ public sealed class Quest
         Side = side;
         CategoryId = categoryId;
         GiverLocation = giverLocation;
+        Ender = ender is null || ender.IsSameNpc(Giver) ? null : ender;
     }
 
     public int Id { get; }
     public string Title { get; }
     public string NpcName { get; }
 
-    // Stored now, used later to give each NPC a fitting voice.
+    // A playable race (Orc, NightElf…), a creature type (Undead, Dragonkin…) or Unknown. Helps cast a fitting voice.
     public string NpcRace { get; }
     public string NpcGender { get; }
+
+    public QuestNpc Giver => new(NpcName, NpcRace, NpcGender);
+
+    // The NPC you hand the quest in to. Null when it's the quest giver, or unknown.
+    public QuestNpc? Ender { get; }
 
     public string? AcceptText { get; }
     public string? ProgressText { get; }
@@ -87,4 +95,7 @@ public sealed class Quest
     };
 
     public bool HasText(QuestPart part) => !string.IsNullOrWhiteSpace(GetText(part));
+
+    // Who says a part: the quest giver offers the quest; progress and complete are said where you hand it in.
+    public QuestNpc SpeakerOf(QuestPart part) => part == QuestPart.Accept ? Giver : Ender ?? Giver;
 }

@@ -65,13 +65,15 @@ public sealed class QuestsController(QuestService questService) : ControllerBase
         return NoContent();
     }
 
-    // Forgets the voice cast for this quest's NPC, so the voice director casts a new one next time.
+    // Forgets the voice cast for the quest giver (npc=giver, the default) or the NPC you hand the quest in to
+    // (npc=ender), so the voice director casts a new one next time.
     [HttpDelete("{id:int}/voice")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
-    public async Task<IActionResult> Recast(int id)
+    public async Task<IActionResult> Recast(int id, [FromQuery] QuestNpcRole npc = QuestNpcRole.Giver)
     {
-        await questService.RecastAsync(id);
+        await questService.RecastAsync(id, npc);
         return NoContent();
     }
 }

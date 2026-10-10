@@ -41,5 +41,6 @@ public interface IPerformanceRepository
 {
     Task<IReadOnlyDictionary<QuestPart, VoicePerformance>> GetForQuestAsync(int questId);
     Task SaveAsync(int questId, QuestPart part, VoicePerformance performance);
+    Task SaveManyAsync(IReadOnlyCollection<(AudioKey Key, VoicePerformance Performance)> performances);
     Task DeleteAsync(int questId, QuestPart part);
 }

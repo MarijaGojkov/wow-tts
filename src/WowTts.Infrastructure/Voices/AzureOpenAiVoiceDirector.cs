@@ -1,5 +1,6 @@
 using System.ClientModel;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI;
@@ -18,7 +19,10 @@ public sealed class AzureOpenAiVoiceDirector(
     DefaultVoiceDirector fallback,
     ILogger<AzureOpenAiVoiceDirector> logger) : IVoiceDirector
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
 
     private readonly VoiceDirectorOptions _options = options.Value;
 
@@ -33,11 +37,21 @@ public sealed class AzureOpenAiVoiceDirector(
 
         Casting (only when more than one voice is offered; otherwise use the one voice given):
         - Pick the voice that best fits the NPC: race, gender, role and personality, as their name and words suggest.
-          The race may be "Unknown"; then judge from the name and the words.
+        - The race is a playable race (Human, Dwarf, NightElf, Gnome, Orc, Troll, Tauren, Undead, Goblin), or for NPCs
+          with a body of their own a creature type (Humanoid, Undead, Dragonkin, Demon, Elemental, Giant, Beast,
+          Mechanical, Critter), or "Unknown"; then judge from the name and the words.
         - Accents help: dwarves suit British or Irish voices (en-GB, en-IE); night elves calm, measured voices;
           gnomes and goblins quick, bright voices; orcs, trolls and tauren deep, rough voices; undead dry, cold voices;
-          humans plain American or British voices.
+          humans plain American or British voices. Dragonkin sound regal and deep, demons cold and menacing,
+          elementals and giants slow and booming, mechanical NPCs flat and precise.
         - Prefer voices that have styles, because they can carry emotion, unless an accent matters more.
+
+        HD voices (when "hdVoices" is true; their names contain ':'):
+        - They sound natural and hear the emotion in the words by themselves. Every one supports the same styles.
+        - Their speed, pitch and style strength can't be changed: always use styleDegree 1.0, ratePercent 0 and
+          pitchPercent 0, and don't mention speed or pitch in the reason. So cast voices that already sound right:
+          naturally deep or gruff ones for orcs, trolls and tauren.
+        - Add a style only when the line clearly calls for it; otherwise null lets the voice choose.
 
         Performing the line:
         - style: one of the chosen voice's styles that matches the mood of this line, or null for a neutral reading.
@@ -49,7 +63,8 @@ public sealed class AzureOpenAiVoiceDirector(
         - pitchPercent: -30 to 30. Lower for big races (orcs, tauren, trolls) and gruff speakers; higher for gnomes and
           for small, young or nervous speakers. 0 for most humans.
         - The part says when the line is said: "accept" (offering the quest), "progress" (the player came back before
-          finishing), "complete" (the player handed it in, often thanks or relief).
+          finishing), "complete" (the player handed it in, often thanks or relief). The npc is whoever says this line:
+          the quest giver for accept, and the NPC the quest is handed in to for progress and complete.
         - reason: one short sentence, at most 20 words, saying why, for the person reviewing the audio.
         """;
 
@@ -108,21 +123,28 @@ public sealed class AzureOpenAiVoiceDirector(
     }
 
     // The request as JSON for the model: the quest, the NPC, the line, and the voices it may choose from.
-    private static string Describe(VoiceDirectionRequest request) => JsonSerializer.Serialize(new
+    // HD voices all share one style list, so it's sent once instead of with every voice.
+    private static string Describe(VoiceDirectionRequest request)
     {
-        quest = request.QuestTitle,
-        part = request.Part.ToString().ToLowerInvariant(),
-        npc = new { name = request.NpcName, gender = request.NpcGender, race = request.NpcRace },
-        line = request.Text,
-        voiceAlreadyCast = request.VoiceIsCast,
-        voices = request.Voices.Select(voice => new
+        bool hd = request.Voices.All(voice => voice.IsHd);
+        return JsonSerializer.Serialize(new
         {
-            name = voice.Name,
-            gender = voice.Gender,
-            locale = voice.Locale,
-            styles = voice.Styles,
-        }),
-    }, JsonOptions);
+            quest = request.QuestTitle,
+            part = request.Part.ToString().ToLowerInvariant(),
+            npc = new { name = request.NpcName, gender = request.NpcGender, race = request.NpcRace },
+            line = request.Text,
+            voiceAlreadyCast = request.VoiceIsCast,
+            hdVoices = hd,
+            stylesOfEveryVoice = hd ? request.Voices[0].Styles : null,
+            voices = request.Voices.Select(voice => new
+            {
+                name = voice.Name,
+                gender = voice.Gender,
+                locale = voice.Locale,
+                styles = hd ? null : voice.Styles,
+            }),
+        }, JsonOptions);
+    }
 
     private sealed record Answer(string Voice, string? Style, double StyleDegree, int RatePercent, int PitchPercent, string Reason);
 }
