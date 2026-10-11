@@ -33,6 +33,35 @@ public sealed class SqliteNpcVoiceRepository(WowTtsDbContext db) : INpcVoiceRepo
         db.NpcVoices.Where(v => v.NpcName == npcName && v.NpcGender == npcGender).ExecuteDeleteAsync();
 }
 
+public sealed class SqliteNpcCharacterRepository(WowTtsDbContext db) : INpcCharacterRepository
+{
+    public async Task<NpcCharacter?> GetAsync(string npcName, string npcGender)
+    {
+        var row = await db.NpcCharacters.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.NpcName == npcName && c.NpcGender == npcGender);
+        return row?.ToDomain();
+    }
+
+    public async Task SaveAsync(NpcCharacter character)
+    {
+        var row = await db.NpcCharacters.FirstOrDefaultAsync(c => c.NpcName == character.NpcName && c.NpcGender == character.NpcGender);
+        if (row is null)
+        {
+            row = new NpcCharacterEntity { NpcName = character.NpcName, NpcGender = character.NpcGender };
+            db.NpcCharacters.Add(row);
+        }
+
+        row.Voice = character.Voice;
+        row.Character = character.Character;
+        row.Reason = character.Reason;
+        row.CreatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+    }
+
+    public Task DeleteAsync(string npcName, string npcGender) =>
+        db.NpcCharacters.Where(c => c.NpcName == npcName && c.NpcGender == npcGender).ExecuteDeleteAsync();
+}
+
 public sealed class SqlitePerformanceRepository(WowTtsDbContext db) : IPerformanceRepository
 {
     public async Task<IReadOnlyDictionary<QuestPart, VoicePerformance>> GetForQuestAsync(int questId) =>

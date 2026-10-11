@@ -14,10 +14,12 @@ public static class DatabaseSetup
         ("Quests", "EnderName", "TEXT"),
         ("Quests", "EnderRace", "TEXT"),
         ("Quests", "EnderGender", "TEXT"),
+        ("AudioPerformances", "Engine", "TEXT"),
+        ("AudioPerformances", "Instructions", "TEXT"),
     ];
 
     // Tables added after databases already existed, created from the model the same way EnsureCreated would.
-    private static readonly string[] AddedTables = ["AudioTimings"];
+    private static readonly string[] AddedTables = ["AudioTimings", "NpcCharacters"];
 
     // Creates the database file and its tables if they don't exist yet. Called once when an app starts.
     public static async Task EnsureDatabaseAsync(this IServiceProvider services)
@@ -42,6 +44,8 @@ public static class DatabaseSetup
             await db.NpcVoices.AnyAsync();
             await db.AudioPerformances.AnyAsync();
             await db.AudioTimings.AnyAsync();
+            await db.NpcCharacters.AnyAsync();
+            await db.AudioPerformances.OrderBy(p => p.QuestId).Select(p => new { p.Engine, p.Instructions }).Take(1).ToListAsync();
         }
         catch (SqliteException ex)
         {

@@ -434,6 +434,21 @@ The database layout changes, so delete `data/wowtts.db` and run the importer aga
 **Skills:** Whisper.net (whisper.cpp) on CUDA, word alignment, Azure `WordBoundary` events, audio decoding with NAudio, syncing React to audio.
 **Commit:** `Add word timings and karaoke preview`
 
+### Phase 9.5: Two voice engines (built, waiting for the gpt-4o-mini-tts resource)
+
+**Goal:** choose per quest part in the viewer between Dragon HD Omni and gpt-4o-mini-tts, which can do accents and characters.
+
+- **Viewer:** each part has **Generate · Dragon HD Omni** and **Generate · GPT-4o mini TTS** (or Regenerate). An engine that isn't set up is greyed out with a hint
+- **Casting for GPT:** the voice director (gpt-5-mini) picks one of the 11 GPT voices (onyx, ash, echo, verse, ballad, fable, alloy, nova, coral, sage, shimmer) and writes the NPC's **character**: race, age, temperament and accent (dwarves a Scottish brogue, trolls a Caribbean lilt, tauren deep and slow…). Saved in a new `NpcCharacters` table, shown under the NPC's voice with **Recast GPT**. Each line gets its own **delivery** (emotion, tone, pace)
+- **Domain/Application:** `VoiceEngine` (Azure, OpenAi) and `Instructions` on `VoicePerformance`, `NpcCharacter`, `IInstructedSpeechSynthesizer`, `ICharacterDirector`, `CharacterCastingService`
+- **Infrastructure:** `OpenAiSpeechSynthesizer` (OpenAI SDK `AudioClient` with instructions, MP3), `OpenAiCharacterDirector` and `DefaultCharacterDirector`, shared `AzureOpenAiOptions`. Two columns on `AudioPerformances` and the `NpcCharacters` table are added to the existing database on startup
+- **API:** `?engine=openAi` on `GET /api/quests/{id}/audio/{part}` and `DELETE /api/quests/{id}/voice`; `GET /api/voices/engines`
+- **Checked:** the database upgraded with nothing lost, the engines endpoint, both buttons in the viewer, and a clear 400 when GPT isn't set up
+- [ ] **You:** create a Foundry resource in East US 2, deploy gpt-4o-mini-tts, set `AZURE_OPENAI_TTS_ENDPOINT`, `AZURE_OPENAI_TTS_API_KEY` and `AZURE_OPENAI_TTS_DEPLOYMENT` (README, "Two voice engines"); then test a dwarf, an orc and a night elf
+
+**Cost:** about $0.015 per minute of speech on Foundry, ~$7–9 for all 1,522 missing accept and complete parts; no free tier.
+**Commit:** `Add a second voice engine: gpt-4o-mini-tts`
+
 ### Phase 10: The addon
 
 **Goal:** open a quest in game and hear it. Quests without audio are saved, so the API can add them.
@@ -545,8 +560,8 @@ Once speech and quests work, these are the natural next steps:
 
 ## Next step
 
-1. Install the CUDA Toolkit 13, then build word timings and the karaoke preview (Phase 9.4).
-2. Compare the standard and HD voices, and the imported AI VoiceOver ones, and pick (Phase 9.1).
+1. Set up gpt-4o-mini-tts (you), then compare it with Dragon HD Omni and the imported AI VoiceOver voices (Phases 9.5 and 9.1).
+2. Word timings for the other zones, one at a time (Phase 9.4).
 3. Decision 11: where Forever is installed, for the addon (Phase 10).
 
 ## Notes

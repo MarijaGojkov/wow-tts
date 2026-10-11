@@ -52,6 +52,26 @@ Without them, quest lines use the default voices (`DefaultMaleVoice` and `Defaul
 
 An NPC keeps the same person when you switch, e.g. `en-US-TonyNeural` becomes `en-US-Tony:DragonHDOmniLatestNeural`. Existing MP3s stay as they are until you regenerate them. Restart the API after changing it.
 
+### Two voice engines
+
+Each quest part in the viewer has two buttons: **Generate · Dragon HD Omni** (Azure Speech, as above) and **Generate · GPT-4o mini TTS**. The second uses OpenAI's `gpt-4o-mini-tts` on Azure OpenAI, which follows written instructions, so NPCs get accents and characters (a dwarf with a Scottish brogue, a slow, deep tauren). The voice director (gpt-5-mini) casts each NPC once (a GPT voice and a character, saved and shown in the viewer with **Recast GPT**) and writes how each line is delivered. It reports no word timings; the importer's `timings` command adds them later with Whisper.
+
+To set it up:
+
+1. In the Azure portal, create a **Foundry** resource in **East US 2** (gpt-4o-mini-tts isn't offered in East US), in the `wow-tts` resource group.
+2. In the Foundry portal, deploy **gpt-4o-mini-tts** (Global Standard). The deployment name is up to you, e.g. `gpt-4o-mini-tts`.
+3. From the deployment's page, set its endpoint, key and name:
+
+   ```powershell
+   setx AZURE_OPENAI_TTS_ENDPOINT "<endpoint from the deployment page>"
+   setx AZURE_OPENAI_TTS_API_KEY "<key>"
+   setx AZURE_OPENAI_TTS_DEPLOYMENT "gpt-4o-mini-tts"
+   ```
+
+4. Restart the API (and Visual Studio if you run it from there). `GET /api/voices/engines` then shows GPT-4o mini TTS as available, and its buttons work.
+
+It's billed per length of audio on Foundry, about $0.015 a minute of speech (roughly 1.5–2 cents a quest); there's no free tier. Without these variables the GPT buttons stay greyed out.
+
 ## Setting up on a new PC
 
 Step by step, so it can be followed by hand or by a coding agent. Commands run from the repo folder in PowerShell. Never paste keys into a chat; set them with `setx` yourself.
@@ -80,6 +100,8 @@ setx AZURE_OPENAI_ENDPOINT "https://wow-agents-marija2000.services.ai.azure.com/
 setx AZURE_OPENAI_API_KEY "<foundry key>"
 setx AZURE_OPENAI_DEPLOYMENT "gpt-5-mini"
 ```
+
+If you use the second engine (GPT-4o mini TTS), also set `AZURE_OPENAI_TTS_ENDPOINT`, `AZURE_OPENAI_TTS_API_KEY` and `AZURE_OPENAI_TTS_DEPLOYMENT` (see "Two voice engines").
 
 Then open a **new** terminal (and restart Visual Studio or the Claude app), because programs only see variables that existed when they started.
 

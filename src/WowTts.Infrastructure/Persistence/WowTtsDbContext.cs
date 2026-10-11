@@ -8,6 +8,7 @@ public sealed class WowTtsDbContext(DbContextOptions<WowTtsDbContext> options) :
     public DbSet<MapZoneEntity> MapZones => Set<MapZoneEntity>();
     public DbSet<QuestCategoryEntity> QuestCategories => Set<QuestCategoryEntity>();
     public DbSet<NpcVoiceEntity> NpcVoices => Set<NpcVoiceEntity>();
+    public DbSet<NpcCharacterEntity> NpcCharacters => Set<NpcCharacterEntity>();
     public DbSet<AudioPerformanceEntity> AudioPerformances => Set<AudioPerformanceEntity>();
     public DbSet<AudioTimingsEntity> AudioTimings => Set<AudioTimingsEntity>();
 
@@ -48,12 +49,20 @@ public sealed class WowTtsDbContext(DbContextOptions<WowTtsDbContext> options) :
             voice.HasIndex(v => new { v.NpcName, v.NpcGender }).IsUnique();
         });
 
+        modelBuilder.Entity<NpcCharacterEntity>(character =>
+        {
+            character.ToTable("NpcCharacters");
+            character.HasKey(c => c.Id);
+            character.HasIndex(c => new { c.NpcName, c.NpcGender }).IsUnique();
+        });
+
         modelBuilder.Entity<AudioPerformanceEntity>(performance =>
         {
             performance.ToTable("AudioPerformances");
             performance.HasKey(p => new { p.QuestId, p.Part });
             performance.Property(p => p.Part).HasConversion<string>().HasMaxLength(20);
             performance.Property(p => p.DirectedBy).HasConversion<string>().HasMaxLength(20);
+            performance.Property(p => p.Engine).HasConversion<string>().HasMaxLength(20);
         });
 
         modelBuilder.Entity<AudioTimingsEntity>(timings =>

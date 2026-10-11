@@ -1093,6 +1093,31 @@ td strong { font-weight: 600; }
         </div>
       </article>
 
+      <article class="quest is-next" id="phase-9-5">
+        <header>
+          <h3><small>Phase 9.5</small>Two voice engines</h3>
+          <span class="pill next">Built · needs the GPT resource</span>
+        </header>
+        <p class="objective">Choose per quest part between Dragon HD Omni and gpt-4o-mini-tts, which can do accents and characters.</p>
+        <div class="quest-body">
+          <div>
+            <p class="label">Objectives</p>
+            <ul class="tasks">
+              <li class="checked"><b class="l-api">Viewer</b><strong>Generate · Dragon HD Omni</strong> and <strong>Generate · GPT-4o mini TTS</strong> on every part; an engine that isn't set up is greyed out.</li>
+              <li class="checked"><b class="l-app">Casting</b>gpt-5-mini picks one of 11 GPT voices and writes the NPC's character (race, age, accent: dwarves a Scottish brogue, tauren deep and slow). Saved per NPC, with Recast GPT; each line gets its own delivery.</li>
+              <li class="checked"><b class="l-infra">Infrastructure</b><code>OpenAiSpeechSynthesizer</code> (instructions, MP3), character directors, an <code>NpcCharacters</code> table added on startup.</li>
+              <li class="checked"><b class="l-api">API</b><code>?engine=openAi</code> on audio and recast; <code>GET /api/voices/engines</code>.</li>
+              <li><b class="l-you">You</b>Foundry resource in East US 2 with gpt-4o-mini-tts, and the three <code>AZURE_OPENAI_TTS_*</code> variables.</li>
+            </ul>
+          </div>
+          <div class="side">
+            <div><p class="label">Checked</p><ul><li>✓ Database upgraded, nothing lost</li><li>✓ Both buttons in the viewer</li><li>✓ Clear message when GPT isn't set up</li></ul></div>
+            <div><p class="label">Cost</p><p>~$0.015 per minute of speech; ~$7–9 for all missing accept and complete parts</p></div>
+            <div><p class="label">Commit</p><p class="commit">Add a second voice engine: gpt-4o-mini-tts</p></div>
+          </div>
+        </div>
+      </article>
+
       <article class="quest" id="phase-10">
         <header>
           <h3><small>Phase 10</small>The addon</h3>
@@ -1257,10 +1282,10 @@ td strong { font-weight: 600; }
 
   <section class="next-step" id="next">
     <p class="eyebrow">Next step</p>
-    <h2>Word timings, then the addon</h2>
+    <h2>Second voice engine, then the addon</h2>
     <ol>
-      <li>Install the CUDA Toolkit 13, then build word timings and the karaoke preview (Phase 9.4).</li>
-      <li>Listen to the standard and HD versions and pick one (Phase 9.1).</li>
+      <li>Set up gpt-4o-mini-tts (you), then compare it with Dragon HD Omni and AI VoiceOver (Phases 9.5 and 9.1).</li>
+      <li>Word timings for the other zones, one at a time (Phase 9.4).</li>
       <li>Phase 10, decision 11: where Forever is installed.</li>
     </ol>
   </section>

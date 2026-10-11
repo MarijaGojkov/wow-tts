@@ -8,6 +8,9 @@ public sealed record SpokenAudio(byte[] Audio, IReadOnlyList<HeardWord> Words);
 // Turns text into audio. Application only knows this interface; Infrastructure provides the Azure version.
 public interface ISpeechSynthesizer
 {
+    // What the viewer calls it, e.g. "Dragon HD Omni".
+    string Name { get; }
+
     // Returns MP3 audio. When voice is null, the synthesizer uses its configured default voice.
     Task<byte[]> SynthesizeAsync(string text, string? voice);
 

@@ -12,6 +12,8 @@ public sealed class AzureSpeechSynthesizer(IOptions<SpeechOptions> options) : IS
 {
     private readonly SpeechOptions _options = options.Value;
 
+    public string Name => _options.UsesHdVoices ? "Dragon HD Omni" : "Azure Speech";
+
     public async Task<byte[]> SynthesizeAsync(string text, string? voice) =>
         (await SpeakAsync(voice ?? _options.DefaultVoice, synthesizer => synthesizer.SpeakTextAsync(text))).Audio;
 

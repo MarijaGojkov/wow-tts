@@ -3,12 +3,15 @@ import {
   audioUrl,
   deleteAudio,
   generateAudio,
+  getEngines,
   recastVoice,
   type Quest,
   type QuestNpc,
   type QuestNpcRole,
   type AudioTimings,
   type QuestPartInfo,
+  type VoiceEngine,
+  type VoiceEngineInfo,
   type VoicePerformance,
 } from './api'
 import { audioCount, errorText, partLabels, sideLabels, sourceLabels, splitWords, voiceLabel } from './labels'
@@ -18,21 +21,39 @@ interface QuestDetailProps {
   onChanged: () => Promise<void>
 }
 
-export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
-  const [recasting, setRecasting] = useState<QuestNpcRole | null>(null)
-  const [error, setError] = useState<string | null>(null)
+// Bumped after each regeneration, so the browser fetches the new MP3 instead of an old one from its cache.
+// Starts at the load time, so it never repeats a number used before a page reload.
+let audioVersion = Date.now()
 
-  const giver: QuestNpc = { name: quest.npcName, race: quest.npcRace, gender: quest.npcGender, voice: quest.voice }
+// Until the API says which engines are set up, offer Azure Speech, which always is.
+const defaultEngines: VoiceEngineInfo[] = [{ id: 'azure', name: 'Azure Speech', available: true }]
+
+export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
+  const [recasting, setRecasting] = useState<{ role: QuestNpcRole; engine: VoiceEngine } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [engines, setEngines] = useState<VoiceEngineInfo[]>(defaultEngines)
+
+  useEffect(() => {
+    getEngines().then(setEngines, () => setEngines(defaultEngines))
+  }, [])
+
+  const giver: QuestNpc = {
+    name: quest.npcName,
+    race: quest.npcRace,
+    gender: quest.npcGender,
+    voice: quest.voice,
+    character: quest.character,
+  }
   const speakers: { role: QuestNpcRole; label: string; npc: QuestNpc }[] = [
     { role: 'giver', label: 'Quest giver', npc: giver },
     ...(quest.ender ? [{ role: 'ender' as const, label: 'Hand in to', npc: quest.ender }] : []),
   ]
 
-  async function recast(role: QuestNpcRole) {
-    setRecasting(role)
+  async function recast(role: QuestNpcRole, engine: VoiceEngine) {
+    setRecasting({ role, engine })
     setError(null)
     try {
-      await recastVoice(quest.id, role)
+      await recastVoice(quest.id, role, engine)
       await onChanged()
     } catch (e) {
       setError(errorText(e, 'Recasting the voice failed.'))
@@ -62,9 +83,9 @@ export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
             key={role}
             label={label}
             npc={npc}
-            recasting={recasting === role}
+            recasting={recasting?.role === role ? recasting.engine : null}
             disabled={recasting !== null}
-            onRecast={() => recast(role)}
+            onRecast={(engine) => recast(role, engine)}
           />
         ))}
         <div>
@@ -117,6 +138,7 @@ export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
             key={`${quest.id}-${part.part}`}
             questId={quest.id}
             part={part}
+            engines={engines}
             showSpeaker={quest.ender !== null}
             onChanged={onChanged}
           />
@@ -126,13 +148,13 @@ export function QuestDetail({ quest, onChanged }: QuestDetailProps) {
   )
 }
 
-// An NPC's name, gender and race, and the voice cast for them with a button to recast it.
+// An NPC's name, gender and race, and how they're cast (Azure voice, GPT character), each with a recast button.
 interface NpcCellsProps {
   label: string
   npc: QuestNpc
-  recasting: boolean
+  recasting: VoiceEngine | null
   disabled: boolean
-  onRecast: () => void
+  onRecast: (engine: VoiceEngine) => void
 }
 
 function NpcCells({ label, npc, recasting, disabled, onRecast }: NpcCellsProps) {
@@ -150,12 +172,23 @@ function NpcCells({ label, npc, recasting, disabled, onRecast }: NpcCellsProps) 
         {npc.voice ? (
           <>
             <p title={npc.voice.reason}>{voiceLabel(npc.voice.voice)}</p>
-            <button type="button" className="link-button" onClick={onRecast} disabled={disabled}>
-              {recasting ? 'Recasting…' : 'Recast'}
+            <button type="button" className="link-button" onClick={() => onRecast('azure')} disabled={disabled}>
+              {recasting === 'azure' ? 'Recasting…' : 'Recast'}
             </button>
           </>
         ) : (
           <p className="sub">Cast on first audio</p>
+        )}
+        {npc.character && (
+          <div className="npc-character">
+            <p title={npc.character.reason}>{voiceLabel(npc.character.voice)}</p>
+            <p className="sub" title={npc.character.character}>
+              {npc.character.character}
+            </p>
+            <button type="button" className="link-button" onClick={() => onRecast('openAi')} disabled={disabled}>
+              {recasting === 'openAi' ? 'Recasting…' : 'Recast GPT'}
+            </button>
+          </div>
         )}
       </div>
     </>
@@ -165,25 +198,26 @@ function NpcCells({ label, npc, recasting, disabled, onRecast }: NpcCellsProps) 
 interface PartCardProps {
   questId: number
   part: QuestPartInfo
+  engines: VoiceEngineInfo[]
   // Only worth showing when the quest has two speakers.
   showSpeaker: boolean
   onChanged: () => Promise<void>
 }
 
-function PartCard({ questId, part, showSpeaker, onChanged }: PartCardProps) {
-  const [busy, setBusy] = useState<'generating' | 'regenerating' | null>(null)
+function PartCard({ questId, part, engines, showSpeaker, onChanged }: PartCardProps) {
+  const [busy, setBusy] = useState<VoiceEngine | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Changes after regenerating, so the browser fetches the new MP3 instead of playing the old one from its cache.
   const [version, setVersion] = useState(0)
   const label = partLabels[part.part]
 
-  async function generate(regenerate: boolean) {
-    setBusy(regenerate ? 'regenerating' : 'generating')
+  async function generate(engine: VoiceEngine) {
+    setBusy(engine)
     setError(null)
     try {
-      if (regenerate) await deleteAudio(questId, part.part)
-      await generateAudio(questId, part.part)
-      setVersion(Date.now())
+      if (part.hasAudio) await deleteAudio(questId, part.part)
+      await generateAudio(questId, part.part, engine)
+      setVersion(++audioVersion)
       await onChanged()
     } catch (e) {
       setError(errorText(e, 'Generating the audio failed.'))
@@ -238,18 +272,19 @@ function PartCard({ questId, part, showSpeaker, onChanged }: PartCardProps) {
       {part.hasAudio && <PerformanceLine performance={part.performance} />}
 
       <footer className="part-foot">
-        {part.hasAudio ? (
-          <>
-            <audio ref={audio} controls preload="none" src={src} />
-            <button type="button" className="regenerate" onClick={() => generate(true)} disabled={busy !== null}>
-              {busy === 'regenerating' ? 'Directing and generating…' : 'Regenerate'}
-            </button>
-          </>
-        ) : (
-          <button type="button" className="generate" onClick={() => generate(false)} disabled={busy !== null}>
-            {busy === 'generating' ? 'Directing and generating…' : 'Generate audio'}
+        {part.hasAudio && <audio ref={audio} controls preload="none" src={src} />}
+        {engines.map((engine) => (
+          <button
+            key={engine.id}
+            type="button"
+            className={part.hasAudio ? 'regenerate' : 'generate'}
+            onClick={() => generate(engine.id)}
+            disabled={busy !== null || !engine.available}
+            title={engine.available ? undefined : `${engine.name} isn't set up yet: see "Two voice engines" in the README`}
+          >
+            {busy === engine.id ? 'Directing and generating…' : `${part.hasAudio ? 'Regenerate' : 'Generate'} · ${engine.name}`}
           </button>
-        )}
+        ))}
         {timings && <TimingBadge timings={timings} />}
         <span
           className="chars"
@@ -370,6 +405,19 @@ function PerformanceLine({ performance }: { performance: VoicePerformance | null
           <span className="director director-imported">{badges.imported}</span>
           {performance.voice}
         </p>
+        <p className="performance-reason">{performance.reason}</p>
+      </div>
+    )
+  }
+
+  if (performance.engine === 'openAi') {
+    return (
+      <div className="performance">
+        <p>
+          <span className={`director director-${performance.directedBy}`}>{badges[performance.directedBy]}</span>
+          {voiceLabel(performance.voice)}
+        </p>
+        {performance.instructions && <p className="performance-instructions">{performance.instructions}</p>}
         <p className="performance-reason">{performance.reason}</p>
       </div>
     )

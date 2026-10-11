@@ -5,7 +5,8 @@ using WowTts.Domain.Speech;
 namespace WowTts.Application.Quests;
 
 // A quest with all its text, for GET /api/quests/{id}. Parts only lists the parts that have text.
-// Npc* and Voice are the quest giver; Ender is the NPC you hand the quest in to, when that's someone else.
+// Npc*, Voice (Azure Speech) and Character (gpt-4o-mini-tts) are the quest giver; Ender is the NPC you hand the
+// quest in to, when that's someone else.
 public sealed record QuestDto(
     int Id,
     string Title,
@@ -22,11 +23,13 @@ public sealed record QuestDto(
     string? MapZoneName,
     MapPoint? MapPosition,
     NpcVoice? Voice,
+    NpcCharacter? Character,
     QuestNpcDto? Ender,
     IReadOnlyList<QuestPartDto> Parts);
 
-// An NPC of a quest and the voice cast for them (null until their first audio).
-public sealed record QuestNpcDto(string Name, string Race, string Gender, NpcVoice? Voice);
+// An NPC of a quest and how they're cast: their Azure Speech voice and their gpt-4o-mini-tts character
+// (each null until their first audio with that engine).
+public sealed record QuestNpcDto(string Name, string Race, string Gender, NpcVoice? Voice, NpcCharacter? Character);
 
 // One part of a quest. Text is what will be spoken, with placeholders already replaced, and Speaker who says it.
 // HasAudio tells whether the MP3 has been generated yet, Performance how it was spoken (null for audio made before

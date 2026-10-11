@@ -38,11 +38,12 @@ export function errorText(error: unknown, fallback: string): string {
 }
 
 // "en-US-DavisNeural" -> "Davis (US)", "en-GB-RyanNeural" -> "Ryan (GB)",
-// "en-US-Davis:DragonHDOmniLatestNeural" -> "Davis (US, HD)"
+// "en-US-Davis:DragonHDOmniLatestNeural" -> "Davis (US, HD)", "onyx" -> "Onyx (GPT)"
 export function voiceLabel(voice: string): string {
   const [persona, model] = voice.split(':')
   const [, region, name] = persona.split('-')
-  if (!name) return voice
+  // gpt-4o-mini-tts voices are plain names: "onyx" -> "Onyx (GPT)"
+  if (!name) return `${voice.charAt(0).toUpperCase()}${voice.slice(1)} (GPT)`
   const shortName = name.replace(/(Multilingual)?Neural$/, '')
   const capitalized = shortName.charAt(0).toUpperCase() + shortName.slice(1)
   return `${capitalized} (${region.toUpperCase()}${model ? ', HD' : ''})`

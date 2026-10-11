@@ -53,6 +53,24 @@ public static class DependencyInjection
                 : provider.GetRequiredService<DefaultVoiceDirector>());
         services.AddScoped<INpcVoiceRepository, SqliteNpcVoiceRepository>();
         services.AddScoped<IPerformanceRepository, SqlitePerformanceRepository>();
+
+        // The second engine: gpt-4o-mini-tts, when AZURE_OPENAI_TTS_ENDPOINT, AZURE_OPENAI_TTS_API_KEY and
+        // AZURE_OPENAI_TTS_DEPLOYMENT are set. The same GPT model as the voice director casts and directs it.
+        services.AddOptions<OpenAiTtsOptions>()
+            .Bind(configuration.GetSection(OpenAiTtsOptions.SectionName))
+            .Configure(options =>
+            {
+                options.Endpoint = configuration["AZURE_OPENAI_TTS_ENDPOINT"] ?? options.Endpoint;
+                options.ApiKey = configuration["AZURE_OPENAI_TTS_API_KEY"] ?? options.ApiKey;
+                options.Deployment = configuration["AZURE_OPENAI_TTS_DEPLOYMENT"] ?? options.Deployment;
+            });
+        services.AddSingleton<IInstructedSpeechSynthesizer, OpenAiSpeechSynthesizer>();
+        services.AddSingleton<DefaultCharacterDirector>();
+        services.AddSingleton<ICharacterDirector>(provider =>
+            provider.GetRequiredService<IOptions<VoiceDirectorOptions>>().Value.IsConfigured
+                ? ActivatorUtilities.CreateInstance<OpenAiCharacterDirector>(provider)
+                : provider.GetRequiredService<DefaultCharacterDirector>());
+        services.AddScoped<INpcCharacterRepository, SqliteNpcCharacterRepository>();
         services.AddScoped<ITimingsRepository, SqliteTimingsRepository>();
 
         // Quests live in a SQLite file. Its path in appsettings.json is relative to the app's project folder.

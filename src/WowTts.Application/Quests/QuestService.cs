@@ -17,9 +17,19 @@ public sealed class QuestService(
     IPerformanceRepository performances,
     INpcVoiceRepository npcVoices,
     ITimingsRepository timings,
+    IInstructedSpeechSynthesizer instructedSpeech,
+    CharacterCastingService characterCasting,
+    INpcCharacterRepository characters,
     ILogger<QuestService> logger)
 {
     public const int MaxPageSize = 500;
+
+    // The speech engines the viewer can generate with: Azure Speech always, gpt-4o-mini-tts once it's set up.
+    public IReadOnlyList<VoiceEngineInfo> GetEngines() =>
+    [
+        new(VoiceEngine.Azure, synthesizer.Name, true),
+        new(VoiceEngine.OpenAi, instructedSpeech.Name, instructedSpeech.IsAvailable),
+    ];
 
     // One page of quests matching the query, ordered by level and then title.
     public async Task<QuestSearchResult> SearchAsync(QuestQuery query)
@@ -106,8 +116,10 @@ public sealed class QuestService(
             quest.CategoryId, lookup.CategoryName(quest.CategoryId),
             zone?.Id, zone?.Name, MapPosition(quest, zone),
             await npcVoices.GetAsync(quest.NpcName, quest.NpcGender),
+            await characters.GetAsync(quest.NpcName, quest.NpcGender),
             quest.Ender is QuestNpc ender
-                ? new QuestNpcDto(ender.Name, ender.Race, ender.Gender, await npcVoices.GetAsync(ender.Name, ender.Gender))
+                ? new QuestNpcDto(ender.Name, ender.Race, ender.Gender,
+                    await npcVoices.GetAsync(ender.Name, ender.Gender), await characters.GetAsync(ender.Name, ender.Gender))
                 : null,
             parts);
     }
@@ -147,9 +159,9 @@ public sealed class QuestService(
             .ToList();
     }
 
-    // Returns the quest part's audio. It's generated with Azure the first time, then read from the saved file,
-    // so each text is only paid for once.
-    public async Task<byte[]> GetOrCreateAudioAsync(int id, QuestPart part)
+    // Returns the quest part's audio. It's generated the first time (with Azure Speech, or gpt-4o-mini-tts when
+    // engine says so), then read from the saved file, so each text is only paid for once.
+    public async Task<byte[]> GetOrCreateAudioAsync(int id, QuestPart part, VoiceEngine engine = VoiceEngine.Azure)
     {
         if (!Enum.IsDefined(part))
             throw new InvalidRequestException($"Unknown quest part '{part}'. Use accept, progress or complete.");
@@ -169,8 +181,11 @@ public sealed class QuestService(
 
         string spoken = TextCleaner.Clean(text);
 
-        logger.LogInformation("Quest {QuestId} {Part}: generating audio for {Characters} characters",
-            id, part, spoken.Length);
+        logger.LogInformation("Quest {QuestId} {Part}: generating audio for {Characters} characters with {Engine}",
+            id, part, spoken.Length, engine);
+
+        if (engine == VoiceEngine.OpenAi)
+            return await CreateWithCharacterAsync(quest, part, spoken);
 
         // The voice director picks the voice and how the line is spoken.
         VoicePerformance performance = await voiceCasting.DecideAsync(quest, part, spoken);
@@ -189,6 +204,24 @@ public sealed class QuestService(
         return result.Audio;
     }
 
+    // gpt-4o-mini-tts: the director casts the NPC's voice and character and writes how this line is delivered.
+    // It reports no word timings; the importer's timings command can add them later with Whisper.
+    private async Task<byte[]> CreateWithCharacterAsync(Quest quest, QuestPart part, string spoken)
+    {
+        if (!instructedSpeech.IsAvailable)
+            throw new InvalidRequestException(
+                $"{instructedSpeech.Name} isn't set up. Set AZURE_OPENAI_TTS_ENDPOINT, AZURE_OPENAI_TTS_API_KEY and AZURE_OPENAI_TTS_DEPLOYMENT, then restart the API.");
+
+        VoicePerformance performance = await characterCasting.DecideAsync(quest, part, spoken);
+        byte[] audio = await instructedSpeech.SpeakAsync(spoken, performance.Voice, performance.Instructions!);
+
+        await audioStore.SaveAsync(quest.Id, part, audio);
+        await performances.SaveAsync(quest.Id, part, performance);
+        await timings.DeleteAsync(quest.Id, part);
+
+        return audio;
+    }
+
     // Removes a quest part's audio, so the next request generates it again with a fresh performance.
     public async Task DeleteAudioAsync(int id, QuestPart part)
     {
@@ -201,15 +234,19 @@ public sealed class QuestService(
         await timings.DeleteAsync(id, part);
     }
 
-    // Forgets the voice cast for one of this quest's NPCs, so the director casts a new one next time.
-    // Audio that already exists keeps its old voice until it's regenerated.
-    public async Task RecastAsync(int id, QuestNpcRole role)
+    // Forgets the voice cast for one of this quest's NPCs (for Azure Speech, or their gpt-4o-mini-tts character),
+    // so the director casts a new one next time. Audio that already exists keeps its old voice until it's regenerated.
+    public async Task RecastAsync(int id, QuestNpcRole role, VoiceEngine engine = VoiceEngine.Azure)
     {
         Quest quest = await GetQuestAsync(id);
         QuestNpc npc = role == QuestNpcRole.Ender
             ? quest.Ender ?? throw new InvalidRequestException($"Quest {id} is handed in to its quest giver, so it has no other NPC to recast.")
             : quest.Giver;
-        await npcVoices.DeleteAsync(npc.Name, npc.Gender);
+
+        if (engine == VoiceEngine.OpenAi)
+            await characters.DeleteAsync(npc.Name, npc.Gender);
+        else
+            await npcVoices.DeleteAsync(npc.Name, npc.Gender);
     }
 
     private async Task<Quest> GetQuestAsync(int id)

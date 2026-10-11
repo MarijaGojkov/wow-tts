@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using WowTts.Application.Quests;
 using WowTts.Domain.Quests;
+using WowTts.Domain.Speech;
 
 namespace WowTts.Api.Controllers;
 
@@ -42,15 +43,16 @@ public sealed class QuestsController(QuestService questService) : ControllerBase
     }
 
     // The MP3 for one part of a quest: accept, progress or complete.
-    // Generated with Azure on the first request, then served from the saved file.
+    // Generated on the first request, with Azure Speech (engine=azure, the default) or gpt-4o-mini-tts
+    // (engine=openAi), then served from the saved file whichever engine made it.
     [HttpGet("{id:int}/audio/{part}")]
     [ProducesResponseType(typeof(Stream), StatusCodes.Status200OK, "audio/mpeg")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status502BadGateway, "application/problem+json")]
-    public async Task<IActionResult> GetAudio(int id, QuestPart part)
+    public async Task<IActionResult> GetAudio(int id, QuestPart part, [FromQuery] VoiceEngine engine = VoiceEngine.Azure)
     {
-        byte[] audio = await questService.GetOrCreateAudioAsync(id, part);
+        byte[] audio = await questService.GetOrCreateAudioAsync(id, part, engine);
 
         // Range requests let the browser jump to any point in the audio (the player's slider, karaoke words).
         return File(audio, "audio/mpeg", enableRangeProcessing: true);
@@ -67,14 +69,16 @@ public sealed class QuestsController(QuestService questService) : ControllerBase
     }
 
     // Forgets the voice cast for the quest giver (npc=giver, the default) or the NPC you hand the quest in to
-    // (npc=ender), so the voice director casts a new one next time.
+    // (npc=ender), so the voice director casts a new one next time. engine=openAi forgets their gpt-4o-mini-tts
+    // character instead of their Azure Speech voice.
     [HttpDelete("{id:int}/voice")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
-    public async Task<IActionResult> Recast(int id, [FromQuery] QuestNpcRole npc = QuestNpcRole.Giver)
+    public async Task<IActionResult> Recast(
+        int id, [FromQuery] QuestNpcRole npc = QuestNpcRole.Giver, [FromQuery] VoiceEngine engine = VoiceEngine.Azure)
     {
-        await questService.RecastAsync(id, npc);
+        await questService.RecastAsync(id, npc, engine);
         return NoContent();
     }
 }

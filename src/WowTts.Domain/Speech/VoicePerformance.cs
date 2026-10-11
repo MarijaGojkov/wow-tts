@@ -9,7 +9,16 @@ public enum VoiceDirector
     Imported
 }
 
+// What speaks a line: Azure Speech (standard or Dragon HD Omni voices, set by Speech:VoiceModel), or OpenAI's
+// gpt-4o-mini-tts on Azure OpenAI, which takes written instructions such as an accent and a character.
+public enum VoiceEngine
+{
+    Azure,
+    OpenAi
+}
+
 // How one line is performed: the voice, an optional speaking style and its strength, and speed and pitch changes.
+// For gpt-4o-mini-tts, Instructions holds the character and delivery it was given instead of a style.
 public sealed record VoicePerformance(
     string Voice,
     string? Style,
@@ -17,7 +26,9 @@ public sealed record VoicePerformance(
     int RatePercent,
     int PitchPercent,
     string Reason,
-    VoiceDirector DirectedBy)
+    VoiceDirector DirectedBy,
+    VoiceEngine Engine = VoiceEngine.Azure,
+    string? Instructions = null)
 {
     public const double MinStyleDegree = 0.5;
     public const double MaxStyleDegree = 2.0;

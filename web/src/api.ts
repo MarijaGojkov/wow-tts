@@ -19,8 +19,28 @@ export interface QuestPartStatus {
   hasAudio: boolean
 }
 
+// What speaks a line: Azure Speech (Dragon HD Omni) or gpt-4o-mini-tts.
+export type VoiceEngine = 'azure' | 'openAi'
+
+// An engine the viewer can generate with, and whether it's set up.
+export interface VoiceEngineInfo {
+  id: VoiceEngine
+  name: string
+  available: boolean
+}
+
+// How an NPC is played with gpt-4o-mini-tts: its voice and character (accent, age, temperament).
+export interface NpcCharacter {
+  npcName: string
+  npcGender: string
+  voice: string
+  character: string
+  reason: string
+}
+
 // How a line was spoken: chosen by the AI voice director, the default when no AI is set up,
 // or imported from another addon (voice is then where it came from, e.g. "AI VoiceOver").
+// For gpt-4o-mini-tts, instructions holds the character and delivery it was given.
 export interface VoicePerformance {
   voice: string
   style: string | null
@@ -29,6 +49,8 @@ export interface VoicePerformance {
   pitchPercent: number
   reason: string
   directedBy: 'ai' | 'default' | 'imported'
+  engine: VoiceEngine
+  instructions: string | null
 }
 
 // The voice cast for an NPC, used for all their quests.
@@ -69,6 +91,7 @@ export interface QuestNpc {
   race: string
   gender: string
   voice: NpcVoice | null
+  character: NpcCharacter | null
 }
 
 export type QuestNpcRole = 'giver' | 'ender'
@@ -99,6 +122,7 @@ export interface Quest extends QuestBase {
   npcRace: string
   npcGender: string
   voice: NpcVoice | null
+  character: NpcCharacter | null
   // The NPC you hand the quest in to, when that's not the quest giver.
   ender: QuestNpc | null
   parts: QuestPartInfo[]
@@ -208,6 +232,13 @@ export async function getQuest(id: number): Promise<Quest> {
   return (await request(`/api/quests/${id}`)).json()
 }
 
+// Fetched once: which engines can generate audio.
+let engines: Promise<VoiceEngineInfo[]> | null = null
+export function getEngines(): Promise<VoiceEngineInfo[]> {
+  engines ??= request('/api/voices/engines').then((response) => response.json())
+  return engines
+}
+
 export async function getStats(): Promise<QuestStats> {
   return (await request('/api/quests/stats')).json()
 }
@@ -220,9 +251,9 @@ export function audioUrl(questId: number, part: QuestPart): string {
   return `/api/quests/${questId}/audio/${part}`
 }
 
-// Asks the API for the audio, which makes it generate and save the MP3 if it doesn't exist yet.
-export async function generateAudio(questId: number, part: QuestPart): Promise<void> {
-  await (await request(audioUrl(questId, part))).blob()
+// Asks the API for the audio, which makes it generate and save the MP3 with that engine if it doesn't exist yet.
+export async function generateAudio(questId: number, part: QuestPart, engine: VoiceEngine): Promise<void> {
+  await (await request(`${audioUrl(questId, part)}?engine=${engine}`)).blob()
 }
 
 async function send(url: string, method: string): Promise<void> {
@@ -241,6 +272,6 @@ export function deleteAudio(questId: number, part: QuestPart): Promise<void> {
 }
 
 // Forgets an NPC's voice, so the voice director casts a new one for the next audio.
-export function recastVoice(questId: number, npc: QuestNpcRole): Promise<void> {
-  return send(`/api/quests/${questId}/voice?npc=${npc}`, 'DELETE')
+export function recastVoice(questId: number, npc: QuestNpcRole, engine: VoiceEngine): Promise<void> {
+  return send(`/api/quests/${questId}/voice?npc=${npc}&engine=${engine}`, 'DELETE')
 }

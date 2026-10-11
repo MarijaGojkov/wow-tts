@@ -983,6 +983,31 @@ audio {
   font-size: 0.78rem;
 }
 
+.npc-character {
+  margin-top: 8px;
+  display: grid;
+}
+
+.npc-character .sub {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.npc-character .link-button {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+}
+
+.performance-instructions {
+  white-space: pre-line;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
 .voice-reason {
   margin-top: -12px;
   color: var(--muted);

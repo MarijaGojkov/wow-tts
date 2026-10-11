@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<GameDataImportService>();
         services.AddScoped<MapService>();
         services.AddScoped<VoiceCastingService>();
+        services.AddScoped<CharacterCastingService>();
 
         return services;
     }
